@@ -1,0 +1,19 @@
+From: Fedora/Cygwin
+Subject: Use size_t for VARLIST size fields
+
+Changes list_size and list_len in VARLIST struct from int to size_t
+for better type safety when dealing with large variable lists.
+
+--- a/variables.h
++++ b/variables.h
+@@ -96,8 +96,8 @@ typedef struct variable {
+ 
+ typedef struct _vlist {
+   SHELL_VAR **list;
+-  int list_size;	/* allocated size */
+-  int list_len;		/* current number of entries */
++  size_t list_size;	/* allocated size */
++  size_t list_len;	/* current number of entries */
+ } VARLIST;
+ 
+ /* The various attributes that a given variable can have. */

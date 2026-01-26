@@ -6176,6 +6176,7 @@ sv_winsize (
 /* Update the value of HOME in the export environment so tilde expansion will
    work on cygwin. */
 #if defined (__CYGWIN__)
+void
 sv_home (
      char *name
 )

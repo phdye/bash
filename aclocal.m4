@@ -331,9 +331,7 @@ AC_CACHE_VAL(bash_cv_opendir_not_robust,
 #include <stdio.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -1464,9 +1462,7 @@ AC_CACHE_VAL(bash_cv_sys_named_pipes,
 [AC_TRY_RUN([
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 

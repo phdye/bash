@@ -1,0 +1,26 @@
+From: Fedora/Cygwin
+Subject: Disable loadable builtins installation
+
+This patch removes the installation of loadable builtins from the
+make install target. The Fedora rationale (April 2002) was FHS compliance:
+the loadable examples are considered sample code that shouldn't be
+installed in system directories like /usr/lib/bash.
+
+INTENTIONALLY NOT APPLIED in this repository because:
+- We want to investigate/enable loadable modules support on Cygwin
+- Debian provides these as a separate 'bash-builtins' package
+- The examples are useful for testing dynamic loading functionality
+
+To disable loadable builtins installation, apply this patch:
+  patch -p1 < cygwin-patches/DISABLE/no-loadable-builtins.patch
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -XXX,7 +XXX,6 @@ install:	.made installdirs
+ 		infodir=$(infodir) htmldir=$(htmldir) DESTDIR=$(DESTDIR) $@ )
+ 	-( cd $(DEFDIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+ 	-( cd $(PO_DIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+-	-( cd $(LOADABLES_DIR) && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+ 
+ install-strip:
+ 	$(MAKE) $(MFLAGS) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' \

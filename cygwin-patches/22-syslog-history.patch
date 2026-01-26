@@ -1,0 +1,18 @@
+From: Fedora/Cygwin
+Subject: Document syslog_history shopt option
+
+When SYSLOG_HISTORY is enabled at compile time and syslog_history
+shopt is set, command history is logged to syslog. This patch
+documents that option in the manpage.
+
+--- a/doc/bash.1
++++ b/doc/bash.1
+@@ -10287,6 +10287,9 @@ to find the directory containing the file supplied as an argument.
+ This option is enabled by default.
+ .TP 8
++.B syslog_history
++If set, command history is logged to syslog.
++.TP 8
+ .B xpg_echo
+ If set, the \fBecho\fP builtin expands backslash-escape sequences
+ by default.

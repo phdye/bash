@@ -43,6 +43,7 @@
 #include "posixstat.h"
 #include "bashintl.h"
 
+#define NEED_SH_SETLINEBUF_DECL
 #include "shell.h"
 #include "parser.h"
 #include "flags.h"
@@ -9713,6 +9714,7 @@ param_expand (
   WORD_LIST *list, *l;
   WORD_DESC *tdesc, *ret;
   int tflag, nullarg;
+  int old_echo_input;
 
 /*itrace("param_expand: `%s' pflags = %d", string+*sindex, pflags);*/
   zindex = *sindex;
@@ -10103,6 +10105,9 @@ arithsub:
 	}
 
 comsub:
+      old_echo_input = echo_input_at_read;
+      /* avoid echoing every substitution again */
+      echo_input_at_read = 0;
       if (pflags & PF_NOCOMSUB)
 	/* we need zindex+1 because string[zindex] == RPAREN */
 	temp1 = substring (string, *sindex, zindex+1);
@@ -10115,6 +10120,7 @@ comsub:
 	}
       FREE (temp);
       temp = temp1;
+      echo_input_at_read = old_echo_input;
       break;
 
     /* Do POSIX.2d9-style arithmetic substitution.  This will probably go

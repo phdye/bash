@@ -1,0 +1,21 @@
+From: Backported from bash 5.2
+Subject: Fix get_arg parameter order in mkbuiltins.c
+
+The get_arg function signature had parameters in wrong order relative
+to how all callers used it. This was caught by GCC 14+ which treats
+incompatible pointer types as errors.
+
+Fixed in bash 5.2 by swapping parameters 2 and 3 to match callers.
+
+--- a/builtins/mkbuiltins.c
++++ b/builtins/mkbuiltins.c
+@@ -744,8 +744,8 @@ strip_whitespace (string)
+ char *
+ get_arg (
+      char *for_whom,
+-     char *string,
+-     DEF_FILE *defs
++     DEF_FILE *defs,
++     char *string
+ )
+ {

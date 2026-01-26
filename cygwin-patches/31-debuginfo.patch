@@ -1,0 +1,22 @@
+From: Fedora/Cygwin
+Subject: Keep .c files for debugging
+
+Normally mkbuiltins generates .c files from .def files and then deletes
+them after compilation. This patch removes the deletion step so the .c
+files remain available for debuggers.
+
+NOTE: This patch applies to builtins/Makefile.in which may not exist
+in this repository (which appears to have been configured for WASM).
+If Makefile.in exists, apply this patch. Otherwise, manually edit
+the Makefile to remove any "$(RM) $*.c" lines.
+
+--- a/builtins/Makefile.in
++++ b/builtins/Makefile.in
+@@ -93,7 +93,6 @@
+ 	$(RM) $@
+ 	./$(MKBUILTINS) $(DIRECTDEFINE) $<
+ 	$(CC) -c $(CCFLAGS) $*.c || ( $(RM) $*.c ; exit 1 )
+-	$(RM) $*.c
+ 
+ # How to make a .c file from a .def file.
+ .def.c:
