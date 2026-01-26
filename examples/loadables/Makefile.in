@@ -89,7 +89,8 @@ SHOBJ_CFLAGS = @SHOBJ_CFLAGS@
 SHOBJ_LD = @SHOBJ_LD@
 SHOBJ_LDFLAGS = @SHOBJ_LDFLAGS@ @LDFLAGS@
 SHOBJ_XLDFLAGS = @SHOBJ_XLDFLAGS@
-SHOBJ_LIBS = @SHOBJ_LIBS@
+# Cygwin: loadables need to link against bash DLL import library
+SHOBJ_LIBS = @SHOBJ_LIBS@ -L$(BUILD_DIR) -lcygbash
 SHOBJ_STATUS = @SHOBJ_STATUS@
 
 INC = -I. -I.. -I$(topdir) -I$(topdir)/lib -I$(topdir)/builtins -I${srcdir} \
