@@ -98,6 +98,8 @@ extern int errno;
 #  include "alias.h"
 #endif
 
+#include "command_hooks.h"
+
 #if defined (HISTORY)
 #  include "bashhist.h"
 #endif
@@ -4280,6 +4282,18 @@ execute_simple_command (simple_command, pipe_in, pipe_out, async, fds_to_close)
     return (EXECUTION_SUCCESS);
 #endif
 
+  /* Run pre-command hooks for loadable modules */
+  if (pre_command_hooks_count () > 0)
+    {
+      pre_command_info_t pre_info;
+      pre_info.command_string = the_printed_command_except_trap;
+      pre_info.cwd = get_string_value ("PWD");
+      pre_info.line_number = line_number;
+      pre_info.is_subshell = subshell_environment != 0;
+      pre_info.is_async = async;
+      run_pre_command_hooks (&pre_info);
+    }
+
   cmdflags = simple_command->flags;
 
   first_word_quoted =
@@ -4670,6 +4684,16 @@ execute_from_filesystem:
 			cmdflags);
 
  return_result:
+  /* Run post-command hooks for loadable modules */
+  if (post_command_hooks_count () > 0)
+    {
+      post_command_info_t post_info;
+      post_info.command_string = the_printed_command_except_trap;
+      post_info.exit_status = result;
+      post_info.signal_number = 0;  /* TODO: extract from wait status if applicable */
+      run_post_command_hooks (&post_info);
+    }
+
   bind_lastarg (lastarg);
   FREE (command_line);
   dispose_words (words);
