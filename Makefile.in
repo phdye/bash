@@ -898,6 +898,8 @@ clean:	basic-clean
 	done
 	-( cd $(PO_DIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
 	-( cd $(LOADABLES_DIR) && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+	-( test -d bash-server && cd bash-server && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
+	-( test -d bashclient && cd bashclient && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
 	$(RM) $(CREATED_SUPPORT)
 
 mostlyclean: basic-clean
@@ -909,6 +911,8 @@ mostlyclean: basic-clean
 	done
 	-( cd $(PO_DIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
 	-( cd $(LOADABLES_DIR) && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+	-( test -d bash-server && cd bash-server && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
+	-( test -d bashclient && cd bashclient && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
 
 distclean:	basic-clean maybe-clean
 	( cd $(DOCDIR) && $(MAKE) $(MFLAGS) $@ )
@@ -919,7 +923,9 @@ distclean:	basic-clean maybe-clean
 	done
 	-( cd $(PO_DIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
 	-( cd $(LOADABLES_DIR) && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
-	$(RM) $(CREATED_CONFIGURE) tags TAGS 
+	-( test -d bash-server && cd bash-server && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
+	-( test -d bashclient && cd bashclient && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
+	$(RM) $(CREATED_CONFIGURE) tags TAGS
 	$(RM) $(CREATED_SUPPORT) Makefile $(CREATED_MAKEFILES) pathnames.h
 
 maintainer-clean:	basic-clean
@@ -934,12 +940,39 @@ maintainer-clean:	basic-clean
 	done
 	-( cd $(PO_DIR) ; $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
 	-( cd $(LOADABLES_DIR) && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) $@ )
+	-( test -d bash-server && cd bash-server && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
+	-( test -d bashclient && cd bashclient && test -f Makefile && $(MAKE) $(MFLAGS) $@ )
 	$(RM) $(CREATED_CONFIGURE) $(CREATED_MAKEFILES)
 	$(RM) $(CREATED_SUPPORT) Makefile pathnames.h
 
 maybe-clean:
 	-if test X"`cd $(topdir) && pwd -P`" != X"`cd $(BUILD_DIR) && pwd -P`" ; then \
 		$(RM) parser-built y.tab.c y.tab.h ; \
+	fi
+
+# bash-server targets (built when --enable-bash-server is specified)
+.PHONY: bash-server bashclient
+
+bash-server: .made
+	@if test -d bash-server && test -f bash-server/Makefile; then \
+		echo "Building bash-server..."; \
+		( cd bash-server && $(MAKE) $(MFLAGS) all ); \
+	else \
+		echo "bash-server not configured (use --enable-bash-server)"; \
+	fi
+
+bashclient: .made
+	@if test -d bashclient && test -f bashclient/Makefile; then \
+		echo "Building bashclient..."; \
+		( cd bashclient && $(MAKE) $(MFLAGS) all ); \
+	else \
+		echo "bashclient not configured (use --enable-bash-server)"; \
+	fi
+
+install-bash-server: bash-server bashclient
+	@if test -d bash-server && test -f bash-server/Makefile; then \
+		( cd bash-server && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) install ); \
+		( cd bashclient && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) install ); \
 	fi
 
 recho$(EXEEXT):		$(SUPPORT_SRC)recho.c

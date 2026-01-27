@@ -1,0 +1,168 @@
+# Makefile for bash-server
+#
+# Copyright (C) 2026 Free Software Foundation, Inc.
+
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+SHELL = @MAKE_SHELL@
+CC = @CC@
+AR = @AR@
+ARFLAGS = @ARFLAGS@
+RANLIB = @RANLIB@
+RM = rm -f
+CP = cp
+
+EXEEXT = @EXEEXT@
+OBJEXT = @OBJEXT@
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+
+srcdir = @srcdir@
+VPATH = @srcdir@
+topdir = @top_srcdir@
+BUILD_DIR = @BUILD_DIR@
+
+DESTDIR =
+
+INSTALL = @INSTALL@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+
+PROFILE_FLAGS = @PROFILE_FLAGS@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
+LOCAL_CFLAGS = @LOCAL_CFLAGS@
+DEFS = @DEFS@
+LOCAL_DEFS = @LOCAL_DEFS@
+
+LDFLAGS = @LDFLAGS@
+LOCAL_LDFLAGS = @LOCAL_LDFLAGS@
+LIBS = @LIBS@
+
+BASHINCDIR = ${topdir}/include
+LIBSRC = ${topdir}/lib
+
+INTL_INC = @INTL_INC@
+
+INCLUDES = -I. -I.. -I$(topdir) -I$(BASHINCDIR) -I$(LIBSRC) $(INTL_INC)
+
+BASE_CCFLAGS = ${PROFILE_FLAGS} $(DEFS) $(LOCAL_DEFS) \
+	${INCLUDES} $(LOCAL_CFLAGS)
+
+CCFLAGS = $(BASE_CCFLAGS) $(CPPFLAGS) $(CFLAGS)
+
+# Program name
+Program = bash-server$(EXEEXT)
+
+# Source files
+SOURCES = server_main.c server_socket.c server_session.c server_protocol.c
+
+# Object files
+OBJECTS = server_main.$(OBJEXT) server_socket.$(OBJEXT) \
+	server_session.$(OBJEXT) server_protocol.$(OBJEXT)
+
+# Libraries from parent build
+BUILTINS_LIB = $(BUILD_DIR)/builtins/libbuiltins.a
+SH_LIB = $(BUILD_DIR)/lib/sh/libsh.a
+READLINE_LIB = @READLINE_LIB@
+HISTORY_LIB = @HISTORY_LIB@
+TERMCAP_LIB = @TERMCAP_LIB@
+GLOB_LIB = $(BUILD_DIR)/lib/glob/libglob.a
+TILDE_LIB = $(BUILD_DIR)/lib/tilde/libtilde.a
+INTL_LIB = @LIBINTL@
+
+# Bash object files we need to link against
+BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
+	$(BUILD_DIR)/eval.$(OBJEXT) \
+	$(BUILD_DIR)/y.tab.$(OBJEXT) \
+	$(BUILD_DIR)/general.$(OBJEXT) \
+	$(BUILD_DIR)/make_cmd.$(OBJEXT) \
+	$(BUILD_DIR)/print_cmd.$(OBJEXT) \
+	$(BUILD_DIR)/dispose_cmd.$(OBJEXT) \
+	$(BUILD_DIR)/execute_cmd.$(OBJEXT) \
+	$(BUILD_DIR)/variables.$(OBJEXT) \
+	$(BUILD_DIR)/copy_cmd.$(OBJEXT) \
+	$(BUILD_DIR)/error.$(OBJEXT) \
+	$(BUILD_DIR)/expr.$(OBJEXT) \
+	$(BUILD_DIR)/flags.$(OBJEXT) \
+	$(BUILD_DIR)/nojobs.$(OBJEXT) \
+	$(BUILD_DIR)/subst.$(OBJEXT) \
+	$(BUILD_DIR)/hashcmd.$(OBJEXT) \
+	$(BUILD_DIR)/hashlib.$(OBJEXT) \
+	$(BUILD_DIR)/mailcheck.$(OBJEXT) \
+	$(BUILD_DIR)/trap.$(OBJEXT) \
+	$(BUILD_DIR)/input.$(OBJEXT) \
+	$(BUILD_DIR)/unwind_prot.$(OBJEXT) \
+	$(BUILD_DIR)/pathexp.$(OBJEXT) \
+	$(BUILD_DIR)/sig.$(OBJEXT) \
+	$(BUILD_DIR)/test.$(OBJEXT) \
+	$(BUILD_DIR)/version.$(OBJEXT) \
+	$(BUILD_DIR)/alias.$(OBJEXT) \
+	$(BUILD_DIR)/array.$(OBJEXT) \
+	$(BUILD_DIR)/arrayfunc.$(OBJEXT) \
+	$(BUILD_DIR)/assoc.$(OBJEXT) \
+	$(BUILD_DIR)/braces.$(OBJEXT) \
+	$(BUILD_DIR)/bracecomp.$(OBJEXT) \
+	$(BUILD_DIR)/bashhist.$(OBJEXT) \
+	$(BUILD_DIR)/bashline.$(OBJEXT) \
+	$(BUILD_DIR)/list.$(OBJEXT) \
+	$(BUILD_DIR)/stringlib.$(OBJEXT) \
+	$(BUILD_DIR)/locale.$(OBJEXT) \
+	$(BUILD_DIR)/findcmd.$(OBJEXT) \
+	$(BUILD_DIR)/redir.$(OBJEXT) \
+	$(BUILD_DIR)/pcomplete.$(OBJEXT) \
+	$(BUILD_DIR)/pcomplib.$(OBJEXT) \
+	$(BUILD_DIR)/syntax.$(OBJEXT) \
+	$(BUILD_DIR)/xmalloc.$(OBJEXT)
+
+LIBRARIES = $(BUILTINS_LIB) $(SH_LIB) $(READLINE_LIB) $(HISTORY_LIB) \
+	$(TERMCAP_LIB) $(GLOB_LIB) $(TILDE_LIB) $(INTL_LIB)
+
+ALL_LIBS = $(LIBRARIES) $(LIBS)
+
+.c.$(OBJEXT):
+	$(RM) $@
+	$(CC) $(CCFLAGS) -c $<
+
+all: $(Program)
+
+$(Program): $(OBJECTS) $(LIBRARIES)
+	$(RM) $@
+	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) $(BASH_OBJECTS) $(ALL_LIBS)
+
+install: $(Program)
+	$(INSTALL_PROGRAM) $(Program) $(DESTDIR)$(bindir)/$(Program)
+
+uninstall:
+	$(RM) $(DESTDIR)$(bindir)/$(Program)
+
+clean:
+	$(RM) $(Program) $(OBJECTS)
+
+distclean: clean
+	$(RM) Makefile
+
+mostlyclean: clean
+
+maintainer-clean: distclean
+
+# Dependencies
+server_main.$(OBJEXT): server_main.c server.h $(topdir)/config.h
+server_socket.$(OBJEXT): server_socket.c server.h $(topdir)/config.h
+server_session.$(OBJEXT): server_session.c server.h $(topdir)/config.h \
+	$(topdir)/shell.h $(topdir)/builtins/common.h
+server_protocol.$(OBJEXT): server_protocol.c server.h $(topdir)/config.h
+
+.PHONY: all install uninstall clean distclean mostlyclean maintainer-clean

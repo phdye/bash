@@ -248,6 +248,9 @@ AC_ARG_ENABLE(mem-scramble, AC_HELP_STRING([--enable-mem-scramble], [scramble me
 AC_ARG_ENABLE(profiling, AC_HELP_STRING([--enable-profiling], [allow profiling with gprof]), opt_profiling=$enableval)
 AC_ARG_ENABLE(static-link, AC_HELP_STRING([--enable-static-link], [link bash statically, for use as a root shell]), opt_static_link=$enableval)
 
+dnl bash-server daemon option
+AC_ARG_ENABLE(bash-server, AC_HELP_STRING([--enable-bash-server], [build bash-server daemon and bashclient]), opt_bash_server=$enableval)
+
 dnl So-called `precious' variables
 AC_ARG_VAR([CC_FOR_BUILD], [C compiler used when compiling binaries used only at build time])
 AC_ARG_VAR([CFLAGS_FOR_BUILD], [Compilation options (CFLAGS) used when compiling binaries used only at build time])
@@ -1297,13 +1300,19 @@ AC_SUBST(LOCAL_DEFS)
 #AC_SUBST(ALLOCA_SOURCE)
 #AC_SUBST(ALLOCA_OBJECT)
 
+dnl bash-server Makefiles (conditional)
+BASH_SERVER_MAKEFILES=
+if test "$opt_bash_server" = "yes"; then
+  BASH_SERVER_MAKEFILES="bash-server/Makefile bashclient/Makefile"
+fi
+
 AC_OUTPUT([Makefile builtins/Makefile lib/readline/Makefile lib/glob/Makefile \
 	  lib/intl/Makefile \
 	  lib/malloc/Makefile lib/sh/Makefile lib/termcap/Makefile \
 	  lib/tilde/Makefile doc/Makefile support/Makefile po/Makefile.in \
 	  examples/loadables/Makefile examples/loadables/Makefile.inc \
 	  examples/loadables/perl/Makefile \
-	  support/bash.pc support/bashbug.sh],
+	  support/bash.pc support/bashbug.sh $BASH_SERVER_MAKEFILES],
 [
 # Makefile uses this timestamp file to record whether config.h is up to date.
 echo timestamp > stamp-h
