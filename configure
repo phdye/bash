@@ -882,6 +882,7 @@ enable_xpg_echo_default
 enable_mem_scramble
 enable_profiling
 enable_static_link
+enable_bash_server
 enable_largefile
 enable_nls
 enable_threads
@@ -1602,6 +1603,7 @@ Optional Features:
   --enable-mem-scramble   scramble memory on calls to malloc and free
   --enable-profiling      allow profiling with gprof
   --enable-static-link    link bash statically, for use as a root shell
+  --enable-bash-server    build bash-server daemon and bashclient
   --disable-largefile     omit support for large files
   --disable-nls           do not use Native Language Support
   --enable-threads={posix|solaris|pth|windows}
@@ -3703,6 +3705,13 @@ fi
 if test ${enable_static_link+y}
 then :
   enableval=$enable_static_link; opt_static_link=$enableval
+fi
+
+
+# Check whether --enable-bash-server was given.
+if test ${enable_bash_server+y}
+then :
+  enableval=$enable_bash_server; opt_bash_server=$enableval
 fi
 
 
@@ -22924,7 +22933,12 @@ fi
 #AC_SUBST(ALLOCA_SOURCE)
 #AC_SUBST(ALLOCA_OBJECT)
 
-ac_config_files="$ac_config_files Makefile builtins/Makefile lib/readline/Makefile lib/glob/Makefile lib/intl/Makefile lib/malloc/Makefile lib/sh/Makefile lib/termcap/Makefile lib/tilde/Makefile doc/Makefile support/Makefile po/Makefile.in examples/loadables/Makefile examples/loadables/Makefile.inc examples/loadables/perl/Makefile support/bash.pc support/bashbug.sh"
+BASH_SERVER_MAKEFILES=
+if test "$opt_bash_server" = "yes"; then
+  BASH_SERVER_MAKEFILES="bash-server/Makefile bashclient/Makefile"
+fi
+
+ac_config_files="$ac_config_files Makefile builtins/Makefile lib/readline/Makefile lib/glob/Makefile lib/intl/Makefile lib/malloc/Makefile lib/sh/Makefile lib/termcap/Makefile lib/tilde/Makefile doc/Makefile support/Makefile po/Makefile.in examples/loadables/Makefile examples/loadables/Makefile.inc examples/loadables/perl/Makefile support/bash.pc support/bashbug.sh $BASH_SERVER_MAKEFILES"
 
 ac_config_commands="$ac_config_commands default"
 
@@ -23657,6 +23671,7 @@ do
     "examples/loadables/perl/Makefile") CONFIG_FILES="$CONFIG_FILES examples/loadables/perl/Makefile" ;;
     "support/bash.pc") CONFIG_FILES="$CONFIG_FILES support/bash.pc" ;;
     "support/bashbug.sh") CONFIG_FILES="$CONFIG_FILES support/bashbug.sh" ;;
+    "$BASH_SERVER_MAKEFILES") CONFIG_FILES="$CONFIG_FILES $BASH_SERVER_MAKEFILES" ;;
     "default") CONFIG_COMMANDS="$CONFIG_COMMANDS default" ;;
 
   *) as_fn_error $? "invalid argument: '$ac_config_target'" "$LINENO" 5;;
