@@ -67,6 +67,7 @@ typedef struct server_config {
     int   max_clients;
     int   verbose;
     int   daemon_mode;
+    int   no_peercred;    /* Disable Cygwin credential handshake (Python compat) */
     char *pid_file;
 } server_config_t;
 
@@ -80,7 +81,7 @@ typedef struct client_session {
 } client_session_t;
 
 /* Function declarations - server_socket.c */
-int  server_socket_create(const char *path);
+int  server_socket_create(const char *path, int no_peercred);
 void server_socket_close(int fd, const char *path);
 int  server_accept_client(int server_fd);
 

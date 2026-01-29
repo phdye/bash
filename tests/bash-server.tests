@@ -6,6 +6,7 @@
 #   bash-server3.sub - Config/auth unit tests (C program)
 #   bash-server4.sub - Integration: server lifecycle, auth, PING, QUIT
 #   bash-server5.sub - Integration: EVAL command execution
+#   bash-server6.sub - Integration: Python client fallback (--no-peercred)
 #
 # Requires: bash-server and bashclient binaries built
 
@@ -32,3 +33,4 @@ ${THIS_SH} ./bash-server3.sub
 echo "bash-server: integration tests"
 ${THIS_SH} ./bash-server4.sub
 ${THIS_SH} ./bash-server5.sub
+${THIS_SH} ./bash-server6.sub

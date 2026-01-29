@@ -47,7 +47,7 @@ test_socket_create_basic(void)
     TEST("server_socket_create: creates socket file");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d.sock", (int)getpid());
     unlink(path);
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd >= 0 && stat(path, &st) == 0 && S_ISSOCK(st.st_mode))
         PASS();
     else
@@ -64,7 +64,7 @@ test_socket_permissions(void)
     TEST("server_socket_create: socket file is mode 0600");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-perm.sock", (int)getpid());
     unlink(path);
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd >= 0 && stat(path, &st) == 0 && (st.st_mode & 0777) == 0600)
         PASS();
     else
@@ -80,11 +80,11 @@ test_socket_replaces_stale(void)
     TEST("server_socket_create: replaces stale socket file");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-stale.sock", (int)getpid());
     /* Create first socket */
-    fd1 = server_socket_create(path);
+    fd1 = server_socket_create(path, 0);
     if (fd1 < 0) { FAIL("first create failed"); return; }
     close(fd1);  /* Close fd but leave file */
     /* Create second socket at same path */
-    fd2 = server_socket_create(path);
+    fd2 = server_socket_create(path, 0);
     if (fd2 >= 0)
         PASS();
     else
@@ -100,7 +100,7 @@ test_socket_close_cleanup(void)
     struct stat st;
     TEST("server_socket_close: removes socket file");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-close.sock", (int)getpid());
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd < 0) { FAIL("create failed"); return; }
     server_socket_close(fd, path);
     if (stat(path, &st) < 0 && errno == ENOENT)
@@ -120,7 +120,7 @@ test_socket_accept_connect(void)
 
     TEST("server_accept_client: accepts a connection");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-acc.sock", (int)getpid());
-    srv_fd = server_socket_create(path);
+    srv_fd = server_socket_create(path, 0);
     if (srv_fd < 0) { FAIL("create failed"); return; }
 
     /* Fork a child to connect */
@@ -130,12 +130,6 @@ test_socket_accept_connect(void)
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
-#ifdef __CYGWIN__
-        {
-            int peercred = 1;
-            setsockopt(cli_fd, SOL_SOCKET, SO_PEERCRED, &peercred, sizeof(peercred));
-        }
-#endif
         if (connect(cli_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
             _exit(1);
         write(cli_fd, "hi\n", 3);
@@ -174,7 +168,7 @@ test_socket_nonblocking(void)
     int fd, flags;
     TEST("server_socket_set_nonblocking: sets O_NONBLOCK");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-nb.sock", (int)getpid());
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd < 0) { FAIL("create failed"); return; }
     server_socket_set_nonblocking(fd);
     flags = fcntl(fd, F_GETFL, 0);
@@ -192,7 +186,7 @@ test_socket_blocking_restore(void)
     int fd, flags;
     TEST("server_socket_set_blocking: clears O_NONBLOCK");
     snprintf(path, sizeof(path), "/tmp/test-bashsrv-%d-bl.sock", (int)getpid());
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd < 0) { FAIL("create failed"); return; }
     server_socket_set_nonblocking(fd);
     server_socket_set_blocking(fd);
@@ -215,7 +209,7 @@ test_socket_path_too_long(void)
     path[0] = '/';
     path[4] = '/';
     path[200] = '\0';
-    fd = server_socket_create(path);
+    fd = server_socket_create(path, 0);
     if (fd < 0 && errno == ENAMETOOLONG)
         PASS();
     else {

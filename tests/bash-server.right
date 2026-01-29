@@ -120,3 +120,8 @@ bash-server: integration tests
   PASS: EVAL variable expansion produces output
   PASS: EVAL with no command returns ERR
   PASS: bashclient CLI: echo works
+  PASS: Python PING returns PONG
+  PASS: Python AUTH returns OK
+  PASS: Python EVAL produces STDOUT
+  PASS: Python EVAL exits with 0
+  PASS: Python QUIT returns BYE

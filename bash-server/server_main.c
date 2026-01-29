@@ -190,6 +190,7 @@ print_usage(const char *progname)
     printf("  -d, --daemon        Run as daemon\n");
     printf("  -p, --pidfile PATH  Write PID to file\n");
     printf("  -m, --max-clients N Maximum simultaneous clients (default: 10)\n");
+    printf("  -P, --no-peercred   Disable Cygwin credential handshake (Python compat)\n");
     printf("  -v, --verbose       Verbose output\n");
     printf("  -h, --help          Show this help\n");
     printf("  -V, --version       Show version\n");
@@ -230,6 +231,7 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
         {"daemon",      no_argument,       0, 'd'},
         {"pidfile",     required_argument, 0, 'p'},
         {"max-clients", required_argument, 0, 'm'},
+        {"no-peercred", no_argument,       0, 'P'},
         {"verbose",     no_argument,       0, 'v'},
         {"help",        no_argument,       0, 'h'},
         {"version",     no_argument,       0, 'V'},
@@ -242,7 +244,7 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
     cfg->max_clients = 10;
 
-    while ((c = getopt_long(argc, argv, "s:dp:m:vhV", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "s:dp:m:PvhV", long_options, &option_index)) != -1) {
         switch (c) {
             case 's':
                 cfg->socket_path = optarg;
@@ -257,6 +259,9 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
                 cfg->max_clients = atoi(optarg);
                 if (cfg->max_clients < 1)
                     cfg->max_clients = 1;
+                break;
+            case 'P':
+                cfg->no_peercred = 1;
                 break;
             case 'v':
                 cfg->verbose = 1;
@@ -533,7 +538,7 @@ main(int argc, char **argv)
     setup_signals();
 
     /* Create Unix domain socket */
-    server_fd = server_socket_create(config.socket_path);
+    server_fd = server_socket_create(config.socket_path, config.no_peercred);
     if (server_fd < 0) {
         fprintf(stderr, "bash-server: failed to create socket %s: %s\n",
                 config.socket_path, strerror(errno));

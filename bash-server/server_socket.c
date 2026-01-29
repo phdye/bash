@@ -22,38 +22,49 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-/* Create and bind a Unix domain socket */
+/* Create and bind a Unix domain socket.
+   If no_peercred is set (Cygwin only), disable the credential handshake
+   to allow non-C clients (e.g. Python) that use non-blocking connect. */
 int
-server_socket_create(const char *path)
+server_socket_create(const char *path, int no_peercred)
 {
     int fd;
     struct sockaddr_un addr;
     int reuse = 1;
-    
+
     /* Validate path length */
     if (strlen(path) >= sizeof(addr.sun_path)) {
         errno = ENAMETOOLONG;
         return -1;
     }
-    
+
     /* Create socket */
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0)
         return -1;
-    
+
     /* Set socket options */
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
 #ifdef __CYGWIN__
-    /* Work around Cygwin AF_UNIX handshake mismatch: Python's socket module
-       sets SO_PEERCRED to disable credential exchange, but C programs don't.
-       The mismatch causes ECONNABORTED on accept().  Setting SO_PEERCRED on
-       the server side makes both ends agree to skip the handshake.
-       See: issue/cygwin-transport-alternatives.md */
-    {
-        int peercred = 1;
-        setsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peercred, sizeof(peercred));
+    if (no_peercred) {
+        /* Cygwin AF_UNIX sockets use TCP loopback internally and perform a
+           credential handshake (secret + ucred exchange) during connect/accept.
+           CPython's socket.connect() uses a non-blocking connect + poll +
+           getsockopt(SO_ERROR) pattern that races with this handshake, causing
+           ECONNABORTED (errno 113) on accept().
+
+           Calling setsockopt(SO_PEERCRED, NULL, 0) disables the credential
+           handshake entirely (af_local_set_no_getpeereid), allowing both C and
+           Python clients to connect.  The tradeoff: getpeereid() and
+           getsockopt(SO_PEERCRED) will no longer return peer credentials.
+
+           Note: passing non-NULL optval or non-zero optlen returns EINVAL --
+           the NULL/0 form is required.  See Cygwin net.cc. */
+        setsockopt(fd, SOL_SOCKET, SO_PEERCRED, NULL, 0);
     }
+#else
+    (void)no_peercred;
 #endif
     
     /* Remove existing socket file if present */
