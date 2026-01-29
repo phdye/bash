@@ -20,6 +20,7 @@
 
 #include "server.h"
 #include <sys/stat.h>
+#include <fcntl.h>
 
 /* Create and bind a Unix domain socket */
 int
@@ -42,6 +43,18 @@ server_socket_create(const char *path)
     
     /* Set socket options */
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
+#ifdef __CYGWIN__
+    /* Work around Cygwin AF_UNIX handshake mismatch: Python's socket module
+       sets SO_PEERCRED to disable credential exchange, but C programs don't.
+       The mismatch causes ECONNABORTED on accept().  Setting SO_PEERCRED on
+       the server side makes both ends agree to skip the handshake.
+       See: issue/cygwin-transport-alternatives.md */
+    {
+        int peercred = 1;
+        setsockopt(fd, SOL_SOCKET, SO_PEERCRED, &peercred, sizeof(peercred));
+    }
+#endif
     
     /* Remove existing socket file if present */
     unlink(path);
@@ -89,17 +102,17 @@ server_socket_close(int fd, const char *path)
 int
 server_accept_client(int server_fd)
 {
-    struct sockaddr_un client_addr;
+    struct sockaddr_storage client_addr;
     socklen_t client_len = sizeof(client_addr);
     int client_fd;
-    
+
     client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_len);
     if (client_fd < 0)
         return -1;
-    
+
     /* Set close-on-exec flag */
     fcntl(client_fd, F_SETFD, FD_CLOEXEC);
-    
+
     return client_fd;
 }
 

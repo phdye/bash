@@ -1,0 +1,155 @@
+# bash-server5.sub -- Integration: EVAL command execution
+#
+# Tests authenticated command execution via the bash-server.
+# Requires a running server (started by this script).
+
+: ${BUILD_DIR:=..}
+
+SERVER_BIN=${BUILD_DIR}/bash-server/bash-server
+TEST_CLIENT=${BUILD_DIR}/bash-server/tests/test_client
+CLIENT_BIN=${BUILD_DIR}/bashclient/bashclient
+
+# Find binaries
+for ext in .exe ""; do
+    [ -x "${SERVER_BIN}${ext}" ] && SERVER_BIN="${SERVER_BIN}${ext}" && break
+done
+for ext in .exe ""; do
+    [ -x "${TEST_CLIENT}${ext}" ] && TEST_CLIENT="${TEST_CLIENT}${ext}" && break
+done
+for ext in .exe ""; do
+    [ -x "${CLIENT_BIN}${ext}" ] && CLIENT_BIN="${CLIENT_BIN}${ext}" && break
+done
+
+if [ ! -x "$SERVER_BIN" ]; then
+    echo "bash-server5.sub: SKIPPED (server binary not found)"
+    exit 0
+fi
+if [ ! -x "$TEST_CLIENT" ]; then
+    echo "bash-server5.sub: SKIPPED (test_client not found)"
+    exit 0
+fi
+
+# Set up temp directory
+TESTDIR=$(mktemp -d /tmp/bash-server-test5.XXXXXX)
+SOCK="${TESTDIR}/sock"
+TOKFILE="${SOCK}.token"
+
+cleanup() {
+    if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null
+        for i in $(seq 1 30); do
+            kill -0 "$SERVER_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -9 "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+    fi
+    rm -rf "$TESTDIR"
+}
+trap cleanup EXIT
+
+failed=0
+pass() { echo "  PASS: $1"; }
+fail() { echo "  FAIL: $1"; failed=$((failed + 1)); }
+
+# --- Start server ---
+"$SERVER_BIN" --socket "$SOCK" --verbose &
+SERVER_PID=$!
+
+# Wait for socket to appear (up to 5s)
+for i in $(seq 1 50); do
+    [ -S "$SOCK" ] && [ -f "$TOKFILE" ] && break
+    sleep 0.1
+done
+
+if [ ! -S "$SOCK" ]; then
+    fail "server did not create socket within 5s"
+    exit 1
+fi
+
+TOKEN=$(cat "$TOKFILE" | tr -d '\n\r')
+
+# --- Test: EVAL without auth returns ERR ---
+EVAL_NOAUTH=$(timeout 5 "$TEST_CLIENT" "$SOCK" EVAL "echo hello" 2>/dev/null)
+if echo "$EVAL_NOAUTH" | grep -q "^ERR"; then
+    pass "EVAL without auth returns ERR"
+else
+    fail "EVAL no auth: got '$EVAL_NOAUTH'"
+fi
+
+# --- Test: EVAL echo hello ---
+EVAL_HELLO=$(timeout 5 "$TEST_CLIENT" "$SOCK" eval "AUTH ${TOKEN}\nEVAL echo hello\nQUIT" 2>/dev/null)
+if echo "$EVAL_HELLO" | grep -q "STDOUT.*aGVsbG8"; then
+    pass "EVAL echo hello produces STDOUT with base64"
+elif echo "$EVAL_HELLO" | grep -q "STDOUT"; then
+    pass "EVAL echo hello produces STDOUT"
+else
+    fail "EVAL echo hello: got '$EVAL_HELLO'"
+fi
+
+# Check exit code 0
+if echo "$EVAL_HELLO" | grep -q "EXIT 0"; then
+    pass "EVAL echo hello exits with 0"
+else
+    fail "EVAL echo hello exit: got '$(echo "$EVAL_HELLO" | grep EXIT)'"
+fi
+
+# --- Test: EVAL false (nonzero exit) ---
+EVAL_FALSE=$(timeout 5 "$TEST_CLIENT" "$SOCK" eval "AUTH ${TOKEN}\nEVAL false\nQUIT" 2>/dev/null)
+if echo "$EVAL_FALSE" | grep -q "EXIT [1-9]"; then
+    pass "EVAL false returns nonzero exit"
+else
+    fail "EVAL false exit: got '$(echo "$EVAL_FALSE" | grep EXIT)'"
+fi
+
+# --- Test: EVAL stderr output ---
+EVAL_STDERR=$(timeout 5 "$TEST_CLIENT" "$SOCK" eval "AUTH ${TOKEN}\nEVAL echo error >&2\nQUIT" 2>/dev/null)
+if echo "$EVAL_STDERR" | grep -q "STDERR"; then
+    pass "EVAL stderr produces STDERR line"
+else
+    fail "EVAL stderr: got '$EVAL_STDERR'"
+fi
+
+# --- Test: EVAL variable expansion ---
+EVAL_VAR=$(timeout 5 "$TEST_CLIENT" "$SOCK" eval "AUTH ${TOKEN}\nEVAL echo \$BASH_VERSION\nQUIT" 2>/dev/null)
+if echo "$EVAL_VAR" | grep -q "STDOUT"; then
+    pass "EVAL variable expansion produces output"
+else
+    fail "EVAL variable: got '$EVAL_VAR'"
+fi
+
+# --- Test: EVAL with empty command ---
+EVAL_EMPTY=$(timeout 5 "$TEST_CLIENT" "$SOCK" multi "AUTH ${TOKEN}\nEVAL" 2>/dev/null | tail -1)
+if echo "$EVAL_EMPTY" | grep -q "^ERR"; then
+    pass "EVAL with no command returns ERR"
+elif echo "$EVAL_EMPTY" | grep -q "^EXIT 0"; then
+    pass "EVAL with no command returns EXIT 0 (empty is valid)"
+else
+    fail "EVAL empty: got '$EVAL_EMPTY'"
+fi
+
+# --- Test: bashclient CLI (if available) ---
+if [ -x "$CLIENT_BIN" ]; then
+    CLI_RESULT=$(timeout 10 "$CLIENT_BIN" -s "$SOCK" -a "$TOKEN" -e 'echo bashclient-works' 2>/dev/null)
+    if echo "$CLI_RESULT" | grep -q "bashclient-works"; then
+        pass "bashclient CLI: echo works"
+    else
+        fail "bashclient CLI: got '$CLI_RESULT'"
+    fi
+else
+    echo "  SKIP: bashclient binary not found"
+fi
+
+# --- Shutdown ---
+kill "$SERVER_PID" 2>/dev/null
+for i in $(seq 1 30); do
+    kill -0 "$SERVER_PID" 2>/dev/null || break
+    sleep 0.1
+done
+SERVER_PID=""
+
+# --- Summary ---
+if [ $failed -gt 0 ]; then
+    echo "bash-server5.sub: $failed test(s) FAILED"
+    exit 1
+fi

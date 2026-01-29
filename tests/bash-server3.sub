@@ -1,0 +1,37 @@
+# bash-server3.sub -- Config/auth unit tests
+#
+# Builds and runs test_config which tests:
+#   - ensure_directory (create, exists, file conflict, permissions)
+#   - read_config_file (socket directive, comments, CLI precedence, missing file, whitespace)
+#   - resolve_socket_path (CLI, env, default /tmp, XDG_RUNTIME_DIR)
+#   - generate_auth_token (64 hex chars, file created 0600, contents, uniqueness)
+#   - parse_arguments (defaults, --socket, -d -v, -m, bounds clamping)
+
+: ${BUILD_DIR:=..}
+TEST_DIR=${BUILD_DIR}/bash-server/tests
+
+# Build test if needed
+if [ ! -x "${TEST_DIR}/test_config" ] && [ ! -x "${TEST_DIR}/test_config.exe" ]; then
+    make -C "${TEST_DIR}" test_config 2>/dev/null || {
+        echo "bash-server3.sub: FAIL (cannot build test_config)"
+        exit 1
+    }
+fi
+
+# Find the binary
+if [ -x "${TEST_DIR}/test_config.exe" ]; then
+    TEST_BIN="${TEST_DIR}/test_config.exe"
+elif [ -x "${TEST_DIR}/test_config" ]; then
+    TEST_BIN="${TEST_DIR}/test_config"
+else
+    echo "bash-server3.sub: FAIL (test_config not found)"
+    exit 1
+fi
+
+# Run with timeout
+timeout 10 "$TEST_BIN"
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "bash-server3.sub: FAIL (exit code $rc)"
+    exit 1
+fi

@@ -1,0 +1,2 @@
+${THIS_SH} ./bash-server.tests > ${BASH_TSTOUT} 2>/dev/null
+diff ${BASH_TSTOUT} bash-server.right && rm -f ${BASH_TSTOUT}

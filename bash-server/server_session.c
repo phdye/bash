@@ -75,32 +75,48 @@ session_cleanup(client_session_t *session)
         close(session->stderr_pipe[1]);
 }
 
+/* External declarations for bash initialization */
+extern void initialize_shell_builtins PARAMS((void));
+extern void initialize_traps PARAMS((void));
+extern void initialize_signals PARAMS((int));
+extern void tilde_initialize PARAMS((void));
+extern void initialize_shell_variables PARAMS((char **, int));
+extern void initialize_job_control PARAMS((int));
+extern void initialize_bash_input PARAMS((void));
+extern void initialize_flags PARAMS((void));
+extern void initialize_shell_options PARAMS((int));
+extern void initialize_bashopts PARAMS((int));
+extern char **shell_environment;
+
 /* Initialize bash shell for this session */
 static void
 init_bash_for_session(void)
 {
     static int bash_initialized = 0;
-    
+
     if (bash_initialized)
         return;
-    
+
     /* Set up shell name */
     shell_name = "bash-server";
-    
+
     /* Not interactive or login shell */
     interactive_shell = 0;
     login_shell = 0;
-    
-    /* Initialize shell if not already done */
-    if (!shell_initialized) {
-        /* Basic initialization - we can't call full shell_initialize()
-           as it requires main's argument handling. Instead we do minimal
-           setup needed for parse_and_execute(). */
-        
-        /* The shell is initialized by the bash library when we link against it.
-           We just need to make sure variables are set up properly. */
-    }
-    
+
+    /* Initialize shell components (pass 0 for non-privileged mode) */
+    initialize_shell_builtins();
+    initialize_traps();
+    initialize_signals(0);
+    tilde_initialize();
+    initialize_shell_variables(shell_environment, 0);
+    initialize_job_control(0);
+    initialize_bash_input();
+    initialize_flags();
+    initialize_shell_options(0);
+    initialize_bashopts(0);
+
+    shell_initialized = 1;
     bash_initialized = 1;
 }
 
@@ -112,12 +128,12 @@ handle_auth(client_session_t *session, const char *arg, server_config_t *config)
         protocol_write_line(session->fd, "%s already authenticated", RSP_OK);
         return 0;
     }
-    
+
     if (!arg || !*arg) {
         protocol_write_line(session->fd, "%s token required", RSP_ERR);
         return 0;
     }
-    
+
     /* Use constant-time comparison for security */
     if (protocol_secure_compare(arg, config->auth_token)) {
         session->authenticated = 1;
@@ -126,7 +142,7 @@ handle_auth(client_session_t *session, const char *arg, server_config_t *config)
     } else {
         protocol_write_line(session->fd, "%s invalid token", RSP_ERR);
     }
-    
+
     return 0;
 }
 
@@ -236,14 +252,16 @@ capture_output(client_session_t *session, const char *command)
         if (!cmd_copy)
             _exit(127);
         
-        /* Execute the command */
-        exit_code = parse_and_execute(cmd_copy, "bash-server", SEVAL_NONINT | SEVAL_NOHIST);
-        
+        /* Execute the command.  parse_and_execute() returns the parser
+           status (0 = success); the command's exit value is stored in
+           the global last_command_exit_value. */
+        parse_and_execute(cmd_copy, "bash-server", SEVAL_NONINT | SEVAL_NOHIST);
+
         /* Flush output */
         fflush(stdout);
         fflush(stderr);
-        
-        _exit(exit_code);
+
+        _exit(last_command_exit_value);
     }
     
     /* Parent process */
@@ -327,12 +345,13 @@ session_handle(client_session_t *session, server_config_t *config)
     char cmd[32];
     char arg[SERVER_MAX_CMD];
     int done = 0;
-    
+    int n;
+
     while (!done) {
         /* Read command */
-        if (protocol_read_line(session->fd, line, sizeof(line)) < 0) {
+        n = protocol_read_line(session->fd, line, sizeof(line));
+        if (n < 0)
             break;  /* Connection closed or error */
-        }
         
         /* Parse command */
         if (protocol_parse_command(line, cmd, arg, sizeof(arg)) < 0) {

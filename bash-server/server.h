@@ -55,10 +55,15 @@
 #define RSP_STDERR  "STDERR"
 #define RSP_EXIT    "EXIT"
 
+/* Token size: 32 bytes of entropy, hex-encoded to 64 chars + NUL */
+#define SERVER_TOKEN_BYTES  32
+#define SERVER_TOKEN_HEXLEN (SERVER_TOKEN_BYTES * 2)
+
 /* Server configuration */
 typedef struct server_config {
     char *socket_path;
-    char *auth_token;
+    char *auth_token;       /* Auto-generated token (heap-allocated) */
+    char *auth_file;        /* Path to token file (heap-allocated) */
     int   max_clients;
     int   verbose;
     int   daemon_mode;
@@ -91,6 +96,7 @@ int  protocol_write_line(int fd, const char *fmt, ...);
 int  protocol_parse_command(const char *line, char *cmd, char *arg, size_t argsize);
 char *protocol_base64_encode(const char *data, size_t len);
 char *protocol_base64_decode(const char *data, size_t *outlen);
+int  protocol_secure_compare(const char *a, const char *b);
 
 /* Function declarations - server_main.c */
 void server_signal_handler(int sig);
