@@ -51,6 +51,12 @@ LDFLAGS = @LDFLAGS@
 LOCAL_LDFLAGS = @LOCAL_LDFLAGS@
 LIBS = @LIBS@
 
+# Library search paths - use BUILD_DIR to find bundled libraries
+# (configure-substituted paths like @RL_LIBDIR@ use make variables
+# only defined in the top-level Makefile, so we use BUILD_DIR directly)
+LIBRARY_LDFLAGS = -L$(BUILD_DIR)/lib/readline -L$(BUILD_DIR)/lib/termcap \
+	-L$(BUILD_DIR)/lib/malloc
+
 BASHINCDIR = ${topdir}/include
 LIBSRC = ${topdir}/lib
 
@@ -78,12 +84,15 @@ BUILTINS_LIB = $(BUILD_DIR)/builtins/libbuiltins.a
 SH_LIB = $(BUILD_DIR)/lib/sh/libsh.a
 READLINE_LIB = @READLINE_LIB@
 HISTORY_LIB = @HISTORY_LIB@
-TERMCAP_LIB = @TERMCAP_LIB@
+TERMCAP_LIB = $(BUILD_DIR)/lib/termcap/libtermcap.a
 GLOB_LIB = $(BUILD_DIR)/lib/glob/libglob.a
 TILDE_LIB = $(BUILD_DIR)/lib/tilde/libtilde.a
+MALLOC_LIB = $(BUILD_DIR)/lib/malloc/libmalloc.a
 INTL_LIB = @LIBINTL@
 
 # Bash object files we need to link against
+# Note: shell.o contains main() but also ~50 globals other modules depend on.
+# We use --allow-multiple-definition so server_main.o's main() wins (listed first).
 BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
 	$(BUILD_DIR)/eval.$(OBJEXT) \
 	$(BUILD_DIR)/y.tab.$(OBJEXT) \
@@ -97,7 +106,7 @@ BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
 	$(BUILD_DIR)/error.$(OBJEXT) \
 	$(BUILD_DIR)/expr.$(OBJEXT) \
 	$(BUILD_DIR)/flags.$(OBJEXT) \
-	$(BUILD_DIR)/nojobs.$(OBJEXT) \
+	$(BUILD_DIR)/@JOBS_O@ \
 	$(BUILD_DIR)/subst.$(OBJEXT) \
 	$(BUILD_DIR)/hashcmd.$(OBJEXT) \
 	$(BUILD_DIR)/hashlib.$(OBJEXT) \
@@ -127,8 +136,12 @@ BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
 	$(BUILD_DIR)/syntax.$(OBJEXT) \
 	$(BUILD_DIR)/xmalloc.$(OBJEXT)
 
+# Build product libraries (valid make prerequisites - always .a file paths)
+LIBDEP = $(BUILTINS_LIB) $(SH_LIB) $(GLOB_LIB) $(TILDE_LIB) $(MALLOC_LIB)
+
+# All libraries for linking (may include -l flags from configure)
 LIBRARIES = $(BUILTINS_LIB) $(SH_LIB) $(READLINE_LIB) $(HISTORY_LIB) \
-	$(TERMCAP_LIB) $(GLOB_LIB) $(TILDE_LIB) $(INTL_LIB)
+	$(TERMCAP_LIB) $(GLOB_LIB) $(TILDE_LIB) $(MALLOC_LIB) $(INTL_LIB)
 
 ALL_LIBS = $(LIBRARIES) $(LIBS)
 
@@ -138,9 +151,9 @@ ALL_LIBS = $(LIBRARIES) $(LIBS)
 
 all: $(Program)
 
-$(Program): $(OBJECTS) $(LIBRARIES)
+$(Program): $(OBJECTS) $(LIBDEP)
 	$(RM) $@
-	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) $(BASH_OBJECTS) $(ALL_LIBS)
+	$(CC) $(LIBRARY_LDFLAGS) $(LDFLAGS) $(LOCAL_LDFLAGS) -Wl,--allow-multiple-definition -o $@ $(OBJECTS) $(BASH_OBJECTS) $(ALL_LIBS)
 
 install: $(Program)
 	$(INSTALL_PROGRAM) $(Program) $(DESTDIR)$(bindir)/$(Program)
