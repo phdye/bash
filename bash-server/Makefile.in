@@ -51,6 +51,9 @@ LDFLAGS = @LDFLAGS@
 LOCAL_LDFLAGS = @LOCAL_LDFLAGS@
 LIBS = @LIBS@
 
+# Cygwin DLL - bash-server links against libcygbash.dll.a
+BASH_DLL = $(BUILD_DIR)/cygbash-@BASHVERS@.dll
+
 BASHINCDIR = ${topdir}/include
 LIBSRC = ${topdir}/lib
 
@@ -73,64 +76,9 @@ SOURCES = server_main.c server_socket.c server_session.c server_protocol.c
 OBJECTS = server_main.$(OBJEXT) server_socket.$(OBJEXT) \
 	server_session.$(OBJEXT) server_protocol.$(OBJEXT)
 
-# Libraries from parent build
-BUILTINS_LIB = $(BUILD_DIR)/builtins/libbuiltins.a
-SH_LIB = $(BUILD_DIR)/lib/sh/libsh.a
-READLINE_LIB = @READLINE_LIB@
-HISTORY_LIB = @HISTORY_LIB@
-TERMCAP_LIB = @TERMCAP_LIB@
-GLOB_LIB = $(BUILD_DIR)/lib/glob/libglob.a
-TILDE_LIB = $(BUILD_DIR)/lib/tilde/libtilde.a
-INTL_LIB = @LIBINTL@
-
-# Bash object files we need to link against
-BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
-	$(BUILD_DIR)/eval.$(OBJEXT) \
-	$(BUILD_DIR)/y.tab.$(OBJEXT) \
-	$(BUILD_DIR)/general.$(OBJEXT) \
-	$(BUILD_DIR)/make_cmd.$(OBJEXT) \
-	$(BUILD_DIR)/print_cmd.$(OBJEXT) \
-	$(BUILD_DIR)/dispose_cmd.$(OBJEXT) \
-	$(BUILD_DIR)/execute_cmd.$(OBJEXT) \
-	$(BUILD_DIR)/variables.$(OBJEXT) \
-	$(BUILD_DIR)/copy_cmd.$(OBJEXT) \
-	$(BUILD_DIR)/error.$(OBJEXT) \
-	$(BUILD_DIR)/expr.$(OBJEXT) \
-	$(BUILD_DIR)/flags.$(OBJEXT) \
-	$(BUILD_DIR)/nojobs.$(OBJEXT) \
-	$(BUILD_DIR)/subst.$(OBJEXT) \
-	$(BUILD_DIR)/hashcmd.$(OBJEXT) \
-	$(BUILD_DIR)/hashlib.$(OBJEXT) \
-	$(BUILD_DIR)/mailcheck.$(OBJEXT) \
-	$(BUILD_DIR)/trap.$(OBJEXT) \
-	$(BUILD_DIR)/input.$(OBJEXT) \
-	$(BUILD_DIR)/unwind_prot.$(OBJEXT) \
-	$(BUILD_DIR)/pathexp.$(OBJEXT) \
-	$(BUILD_DIR)/sig.$(OBJEXT) \
-	$(BUILD_DIR)/test.$(OBJEXT) \
-	$(BUILD_DIR)/version.$(OBJEXT) \
-	$(BUILD_DIR)/alias.$(OBJEXT) \
-	$(BUILD_DIR)/array.$(OBJEXT) \
-	$(BUILD_DIR)/arrayfunc.$(OBJEXT) \
-	$(BUILD_DIR)/assoc.$(OBJEXT) \
-	$(BUILD_DIR)/braces.$(OBJEXT) \
-	$(BUILD_DIR)/bracecomp.$(OBJEXT) \
-	$(BUILD_DIR)/bashhist.$(OBJEXT) \
-	$(BUILD_DIR)/bashline.$(OBJEXT) \
-	$(BUILD_DIR)/list.$(OBJEXT) \
-	$(BUILD_DIR)/stringlib.$(OBJEXT) \
-	$(BUILD_DIR)/locale.$(OBJEXT) \
-	$(BUILD_DIR)/findcmd.$(OBJEXT) \
-	$(BUILD_DIR)/redir.$(OBJEXT) \
-	$(BUILD_DIR)/pcomplete.$(OBJEXT) \
-	$(BUILD_DIR)/pcomplib.$(OBJEXT) \
-	$(BUILD_DIR)/syntax.$(OBJEXT) \
-	$(BUILD_DIR)/xmalloc.$(OBJEXT)
-
-LIBRARIES = $(BUILTINS_LIB) $(SH_LIB) $(READLINE_LIB) $(HISTORY_LIB) \
-	$(TERMCAP_LIB) $(GLOB_LIB) $(TILDE_LIB) $(INTL_LIB)
-
-ALL_LIBS = $(LIBRARIES) $(LIBS)
+# On Cygwin, all bash internals are in cygbash-X.Y.dll.
+# bash-server links against the DLL import library (libcygbash.dll.a)
+# instead of individual .o files and .a archives.
 
 .c.$(OBJEXT):
 	$(RM) $@
@@ -138,9 +86,9 @@ ALL_LIBS = $(LIBRARIES) $(LIBS)
 
 all: $(Program)
 
-$(Program): $(OBJECTS) $(LIBRARIES)
+$(Program): $(OBJECTS) $(BASH_DLL)
 	$(RM) $@
-	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) $(BASH_OBJECTS) $(ALL_LIBS)
+	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) -L$(BUILD_DIR) -lcygbash $(LIBS)
 
 install: $(Program)
 	$(INSTALL_PROGRAM) $(Program) $(DESTDIR)$(bindir)/$(Program)
