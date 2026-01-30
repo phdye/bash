@@ -97,7 +97,7 @@ BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
 	$(BUILD_DIR)/error.$(OBJEXT) \
 	$(BUILD_DIR)/expr.$(OBJEXT) \
 	$(BUILD_DIR)/flags.$(OBJEXT) \
-	$(BUILD_DIR)/nojobs.$(OBJEXT) \
+	$(BUILD_DIR)/@JOBS_O@ \
 	$(BUILD_DIR)/subst.$(OBJEXT) \
 	$(BUILD_DIR)/hashcmd.$(OBJEXT) \
 	$(BUILD_DIR)/hashlib.$(OBJEXT) \
@@ -127,6 +127,10 @@ BASH_OBJECTS = $(BUILD_DIR)/shell.$(OBJEXT) \
 	$(BUILD_DIR)/syntax.$(OBJEXT) \
 	$(BUILD_DIR)/xmalloc.$(OBJEXT)
 
+# Build product libraries (valid make prerequisites - always .a file paths)
+LIBDEP = $(BUILTINS_LIB) $(SH_LIB) $(GLOB_LIB) $(TILDE_LIB)
+
+# All libraries for linking (may include -l flags from configure)
 LIBRARIES = $(BUILTINS_LIB) $(SH_LIB) $(READLINE_LIB) $(HISTORY_LIB) \
 	$(TERMCAP_LIB) $(GLOB_LIB) $(TILDE_LIB) $(INTL_LIB)
 
@@ -138,7 +142,7 @@ ALL_LIBS = $(LIBRARIES) $(LIBS)
 
 all: $(Program)
 
-$(Program): $(OBJECTS) $(LIBRARIES)
+$(Program): $(OBJECTS) $(LIBDEP)
 	$(RM) $@
 	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) $(BASH_OBJECTS) $(ALL_LIBS)
 
