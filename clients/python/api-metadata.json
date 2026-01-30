@@ -1,0 +1,1060 @@
+{
+  "package": {
+    "name": "bashclient",
+    "language": "python",
+    "version": "0.1.0",
+    "description": "Async Python client for bash-server v2 NDJSON protocol",
+    "python_requires": ">=3.8",
+    "dependencies": [],
+    "dev_dependencies": [
+      "pytest>=7.0",
+      "pytest-asyncio>=0.21"
+    ],
+    "license": "GPL-3.0-or-later",
+    "documentation": {
+      "readme": "README.md",
+      "api": "API.md",
+      "guide": "GUIDE.md",
+      "install": "INSTALL.md",
+      "architecture": "ARCHITECTURE.md",
+      "contributing": "CONTRIBUTING.md",
+      "troubleshooting": "TROUBLESHOOTING.md",
+      "changelog": "CHANGELOG.md",
+      "examples": "examples/"
+    }
+  },
+  "modules": [
+    {
+      "name": "bashclient",
+      "file": "__init__.py",
+      "description": "Package entry point. Re-exports public API, defines __version__ and __all__.",
+      "exports": [
+        "BashClient",
+        "EvalResult", "PingResult", "AuthResult",
+        "VarInfo", "FuncInfo", "AliasInfo", "TrapInfo", "InspectResult",
+        "ObserveEvent", "DebugEvent", "BreakpointInfo", "PtyEvent",
+        "BashClientError", "ConnectionError", "AuthenticationError",
+        "ProtocolError", "TimeoutError", "ChannelError",
+        "__version__"
+      ]
+    },
+    {
+      "name": "bashclient.client",
+      "file": "client.py",
+      "description": "BashClient class -- main entry point for all operations."
+    },
+    {
+      "name": "bashclient.channels",
+      "file": "channels.py",
+      "description": "Channel method implementations for all 6 v2 protocol channels."
+    },
+    {
+      "name": "bashclient.protocol",
+      "file": "protocol.py",
+      "description": "NDJSON wire protocol encoding and decoding."
+    },
+    {
+      "name": "bashclient.transport",
+      "file": "transport.py",
+      "description": "Transport ABC and 4 concrete implementations."
+    },
+    {
+      "name": "bashclient.types",
+      "file": "types.py",
+      "description": "Dataclass types for results and events."
+    },
+    {
+      "name": "bashclient.errors",
+      "file": "errors.py",
+      "description": "Exception hierarchy."
+    }
+  ],
+  "classes": [
+    {
+      "name": "BashClient",
+      "module": "bashclient.client",
+      "description": "Async client for bash-server v2 NDJSON protocol. Provides connection management, authentication, and access to all 6 protocol channels.",
+      "constructor": {
+        "signature": "BashClient(timeout: float = 30.0)",
+        "parameters": [
+          {
+            "name": "timeout",
+            "type": "float",
+            "description": "Default timeout in seconds for all operations.",
+            "required": false,
+            "default": 30.0
+          }
+        ]
+      },
+      "methods": [
+        {
+          "name": "connect",
+          "signature": "async connect(path: str) -> None",
+          "description": "Connect to bash-server via Unix domain socket.",
+          "parameters": [
+            {
+              "name": "path",
+              "type": "str",
+              "description": "Path to the Unix socket file.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when connected." },
+          "raises": ["ConnectionError"],
+          "example": "await client.connect('/tmp/bash-server-1000/sock')",
+          "docs": "API.md#connect"
+        },
+        {
+          "name": "connect_stdio",
+          "signature": "async connect_stdio(cmd: List[str]) -> None",
+          "description": "Connect to bash-server by launching it as a subprocess with stdio transport.",
+          "parameters": [
+            {
+              "name": "cmd",
+              "type": "List[str]",
+              "description": "Command and arguments to launch bash-server (e.g., ['bash-server', '--stdio']).",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when connected." },
+          "raises": ["ConnectionError"],
+          "example": "await client.connect_stdio(['bash-server', '--stdio'])",
+          "docs": "API.md#connect_stdio"
+        },
+        {
+          "name": "connect_fd",
+          "signature": "async connect_fd(read_fd: int, write_fd: int) -> None",
+          "description": "Connect to bash-server using pre-opened file descriptors.",
+          "parameters": [
+            {
+              "name": "read_fd",
+              "type": "int",
+              "description": "File descriptor to read server responses from.",
+              "required": true
+            },
+            {
+              "name": "write_fd",
+              "type": "int",
+              "description": "File descriptor to write client requests to.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when connected." },
+          "raises": ["ConnectionError"],
+          "example": "await client.connect_fd(3, 4)",
+          "docs": "API.md#connect_fd"
+        },
+        {
+          "name": "connect_named_pipe",
+          "signature": "async connect_named_pipe(pipe_name: str) -> None",
+          "description": "Connect to bash-server via a Windows Named Pipe.",
+          "parameters": [
+            {
+              "name": "pipe_name",
+              "type": "str",
+              "description": "Named Pipe path (e.g., '\\\\.\\pipe\\bash-server').",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when connected." },
+          "raises": ["ConnectionError"],
+          "example": "await client.connect_named_pipe(r'\\\\.\\pipe\\bash-server')",
+          "docs": "API.md#connect_named_pipe"
+        },
+        {
+          "name": "auth",
+          "signature": "async auth(token: str) -> AuthResult",
+          "description": "Authenticate with the server using the provided token.",
+          "parameters": [
+            {
+              "name": "token",
+              "type": "str",
+              "description": "256-bit authentication token (hex string).",
+              "required": true
+            }
+          ],
+          "returns": { "type": "AuthResult", "description": "Authentication result with success status and message." },
+          "raises": ["AuthenticationError", "TimeoutError", "ConnectionError"],
+          "example": "result = await client.auth(token='abc123...')",
+          "docs": "API.md#auth"
+        },
+        {
+          "name": "eval",
+          "signature": "async eval(cmd: str, timeout: Optional[float] = None) -> EvalResult",
+          "description": "Execute a shell command and return stdout, stderr, and exit code.",
+          "parameters": [
+            {
+              "name": "cmd",
+              "type": "str",
+              "description": "Shell command to execute.",
+              "required": true
+            },
+            {
+              "name": "timeout",
+              "type": "Optional[float]",
+              "description": "Timeout in seconds. Uses client default if not specified.",
+              "required": false,
+              "default": null
+            }
+          ],
+          "returns": { "type": "EvalResult", "description": "Command result with stdout, stderr, exit_code, and optional duration." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError", "ConnectionError"],
+          "example": "result = await client.eval('echo hello')\nprint(result.stdout)",
+          "docs": "API.md#eval"
+        },
+        {
+          "name": "eval_parsed",
+          "signature": "async eval_parsed(ast: dict, timeout: Optional[float] = None) -> EvalResult",
+          "description": "Execute a pre-parsed COMMAND JSON tree.",
+          "parameters": [
+            {
+              "name": "ast",
+              "type": "dict",
+              "description": "COMMAND tree as a JSON-compatible dict.",
+              "required": true
+            },
+            {
+              "name": "timeout",
+              "type": "Optional[float]",
+              "description": "Timeout in seconds.",
+              "required": false,
+              "default": null
+            }
+          ],
+          "returns": { "type": "EvalResult", "description": "Command result." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "result = await client.eval_parsed({'type': 'simple', 'words': ['echo', 'hi']})",
+          "docs": "API.md#eval_parsed"
+        },
+        {
+          "name": "ping",
+          "signature": "async ping() -> PingResult",
+          "description": "Ping the server and measure latency.",
+          "parameters": [],
+          "returns": { "type": "PingResult", "description": "Ping result with latency and server version." },
+          "raises": ["TimeoutError", "ConnectionError"],
+          "example": "result = await client.ping()\nprint(f'Latency: {result.latency}ms')",
+          "docs": "API.md#ping"
+        },
+        {
+          "name": "close",
+          "signature": "async close() -> None",
+          "description": "Send disconnect message and close the transport.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when closed." },
+          "raises": [],
+          "example": "await client.close()",
+          "docs": "API.md#close"
+        },
+        {
+          "name": "configure",
+          "signature": "async configure(**kwargs) -> None",
+          "description": "Set session configuration options on the server.",
+          "parameters": [
+            {
+              "name": "observe_level",
+              "type": "Optional[str]",
+              "description": "Observation level: 'basic' or 'detailed'.",
+              "required": false
+            },
+            {
+              "name": "wire_format",
+              "type": "Optional[str]",
+              "description": "Wire format: 'ndjson' or 'binary'.",
+              "required": false
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when configured." },
+          "raises": ["TimeoutError", "ChannelError"],
+          "example": "await client.configure(observe_level='detailed')",
+          "docs": "API.md#configure"
+        },
+        {
+          "name": "get_var",
+          "signature": "async get_var(name: str) -> Optional[VarInfo]",
+          "description": "Get a shell variable's value and attributes.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Variable name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "Optional[VarInfo]", "description": "Variable info, or None if not set." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "info = await client.get_var('PATH')\nprint(info.value)",
+          "docs": "API.md#get_var"
+        },
+        {
+          "name": "set_var",
+          "signature": "async set_var(name: str, value: str) -> None",
+          "description": "Set a shell variable.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Variable name.",
+              "required": true
+            },
+            {
+              "name": "value",
+              "type": "str",
+              "description": "Variable value.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when set." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.set_var('MY_VAR', 'hello')",
+          "docs": "API.md#set_var"
+        },
+        {
+          "name": "unset_var",
+          "signature": "async unset_var(name: str) -> None",
+          "description": "Unset a shell variable.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Variable name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when unset." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.unset_var('MY_VAR')",
+          "docs": "API.md#unset_var"
+        },
+        {
+          "name": "get_func",
+          "signature": "async get_func(name: str) -> Optional[FuncInfo]",
+          "description": "Get a shell function's definition.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Function name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "Optional[FuncInfo]", "description": "Function info, or None if not defined." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "func = await client.get_func('my_func')\nprint(func.body)",
+          "docs": "API.md#get_func"
+        },
+        {
+          "name": "set_func",
+          "signature": "async set_func(name: str, body: str) -> None",
+          "description": "Define a shell function.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Function name.",
+              "required": true
+            },
+            {
+              "name": "body",
+              "type": "str",
+              "description": "Function body (shell code).",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when defined." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.set_func('greet', 'echo Hello $1')",
+          "docs": "API.md#set_func"
+        },
+        {
+          "name": "unset_func",
+          "signature": "async unset_func(name: str) -> None",
+          "description": "Remove a shell function.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Function name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when removed." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.unset_func('greet')",
+          "docs": "API.md#unset_func"
+        },
+        {
+          "name": "get_alias",
+          "signature": "async get_alias(name: str) -> Optional[AliasInfo]",
+          "description": "Get a shell alias definition.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Alias name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "Optional[AliasInfo]", "description": "Alias info, or None if not defined." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "alias = await client.get_alias('ll')\nprint(alias.value)",
+          "docs": "API.md#get_alias"
+        },
+        {
+          "name": "set_alias",
+          "signature": "async set_alias(name: str, value: str) -> None",
+          "description": "Define a shell alias.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Alias name.",
+              "required": true
+            },
+            {
+              "name": "value",
+              "type": "str",
+              "description": "Alias expansion value.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when defined." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.set_alias('ll', 'ls -la')",
+          "docs": "API.md#set_alias"
+        },
+        {
+          "name": "unset_alias",
+          "signature": "async unset_alias(name: str) -> None",
+          "description": "Remove a shell alias.",
+          "parameters": [
+            {
+              "name": "name",
+              "type": "str",
+              "description": "Alias name.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when removed." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.unset_alias('ll')",
+          "docs": "API.md#unset_alias"
+        },
+        {
+          "name": "get_trap",
+          "signature": "async get_trap(signal: str) -> Optional[TrapInfo]",
+          "description": "Get a trap handler for a signal.",
+          "parameters": [
+            {
+              "name": "signal",
+              "type": "str",
+              "description": "Signal name (e.g., 'EXIT', 'INT', 'TERM').",
+              "required": true
+            }
+          ],
+          "returns": { "type": "Optional[TrapInfo]", "description": "Trap info, or None if no trap is set." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "trap = await client.get_trap('EXIT')\nprint(trap.action)",
+          "docs": "API.md#get_trap"
+        },
+        {
+          "name": "set_trap",
+          "signature": "async set_trap(signal: str, action: str) -> None",
+          "description": "Set a trap handler for a signal.",
+          "parameters": [
+            {
+              "name": "signal",
+              "type": "str",
+              "description": "Signal name.",
+              "required": true
+            },
+            {
+              "name": "action",
+              "type": "str",
+              "description": "Shell command to execute on signal.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when set." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.set_trap('EXIT', 'echo goodbye')",
+          "docs": "API.md#set_trap"
+        },
+        {
+          "name": "inspect",
+          "signature": "async inspect(namespace: str) -> InspectResult",
+          "description": "List all items in a namespace (variables, functions, aliases, or traps).",
+          "parameters": [
+            {
+              "name": "namespace",
+              "type": "str",
+              "description": "Namespace to inspect: 'variables', 'functions', 'aliases', or 'traps'.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "InspectResult", "description": "Inspection result with namespace name and list of items." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "result = await client.inspect('variables')\nfor v in result.items:\n    print(v.name)",
+          "docs": "API.md#inspect"
+        },
+        {
+          "name": "observe_start",
+          "signature": "async observe_start(level: str = 'basic') -> None",
+          "description": "Subscribe to command observation events.",
+          "parameters": [
+            {
+              "name": "level",
+              "type": "str",
+              "description": "Observation level: 'basic' or 'detailed'.",
+              "required": false,
+              "default": "basic"
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when subscription is active." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.observe_start(level='detailed')",
+          "docs": "API.md#observe_start"
+        },
+        {
+          "name": "observe_stop",
+          "signature": "async observe_stop() -> None",
+          "description": "Unsubscribe from command observation events.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when unsubscribed." },
+          "raises": ["TimeoutError"],
+          "example": "await client.observe_stop()",
+          "docs": "API.md#observe_stop"
+        },
+        {
+          "name": "on_observe",
+          "signature": "on_observe(callback: Callable[[ObserveEvent], Any]) -> None",
+          "description": "Register a callback for observation events. Supports sync and async callbacks.",
+          "parameters": [
+            {
+              "name": "callback",
+              "type": "Callable[[ObserveEvent], Any]",
+              "description": "Function called with each ObserveEvent.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Returns immediately." },
+          "raises": [],
+          "example": "def on_cmd(event):\n    print(f'{event.type}: {event.command}')\nclient.on_observe(on_cmd)",
+          "docs": "API.md#on_observe"
+        },
+        {
+          "name": "breakpoint_set",
+          "signature": "async breakpoint_set(bp_type: str, target: str) -> BreakpointInfo",
+          "description": "Set a debugger breakpoint.",
+          "parameters": [
+            {
+              "name": "bp_type",
+              "type": "str",
+              "description": "Breakpoint type: 'command', 'line', or 'function'.",
+              "required": true
+            },
+            {
+              "name": "target",
+              "type": "str",
+              "description": "Breakpoint target (command name, line number, or function name).",
+              "required": true
+            }
+          ],
+          "returns": { "type": "BreakpointInfo", "description": "Information about the created breakpoint." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "bp = await client.breakpoint_set('function', 'my_func')",
+          "docs": "API.md#breakpoint_set"
+        },
+        {
+          "name": "breakpoint_clear",
+          "signature": "async breakpoint_clear(bp_id: int) -> None",
+          "description": "Remove a debugger breakpoint.",
+          "parameters": [
+            {
+              "name": "bp_id",
+              "type": "int",
+              "description": "Breakpoint ID returned by breakpoint_set.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when cleared." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.breakpoint_clear(bp.id)",
+          "docs": "API.md#breakpoint_clear"
+        },
+        {
+          "name": "debug_step",
+          "signature": "async debug_step() -> None",
+          "description": "Step into the next command (enters functions).",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when step command is sent." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.debug_step()",
+          "docs": "API.md#debug_step"
+        },
+        {
+          "name": "debug_next",
+          "signature": "async debug_next() -> None",
+          "description": "Step over to the next command (skips into functions).",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when next command is sent." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.debug_next()",
+          "docs": "API.md#debug_next"
+        },
+        {
+          "name": "debug_finish",
+          "signature": "async debug_finish() -> None",
+          "description": "Continue execution until the current function returns.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when finish command is sent." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.debug_finish()",
+          "docs": "API.md#debug_finish"
+        },
+        {
+          "name": "debug_skip",
+          "signature": "async debug_skip() -> None",
+          "description": "Skip the current command without executing it.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when skip command is sent." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.debug_skip()",
+          "docs": "API.md#debug_skip"
+        },
+        {
+          "name": "debug_continue",
+          "signature": "async debug_continue() -> None",
+          "description": "Continue execution until the next breakpoint.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when continue command is sent." },
+          "raises": ["AuthenticationError", "TimeoutError"],
+          "example": "await client.debug_continue()",
+          "docs": "API.md#debug_continue"
+        },
+        {
+          "name": "inspect_ast",
+          "signature": "async inspect_ast() -> dict",
+          "description": "Inspect the current command's AST (when stopped at a breakpoint).",
+          "parameters": [],
+          "returns": { "type": "dict", "description": "COMMAND tree as a JSON-compatible dict." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "ast = await client.inspect_ast()\nprint(ast['type'])",
+          "docs": "API.md#inspect_ast"
+        },
+        {
+          "name": "on_debug",
+          "signature": "on_debug(callback: Callable[[DebugEvent], Any]) -> None",
+          "description": "Register a callback for debug events (breakpoint hits, step completions).",
+          "parameters": [
+            {
+              "name": "callback",
+              "type": "Callable[[DebugEvent], Any]",
+              "description": "Function called with each DebugEvent.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Returns immediately." },
+          "raises": [],
+          "example": "def on_bp(event):\n    print(f'Hit: {event.location}')\nclient.on_debug(on_bp)",
+          "docs": "API.md#on_debug"
+        },
+        {
+          "name": "pty_spawn",
+          "signature": "async pty_spawn(cmd: str = 'bash', rows: int = 24, cols: int = 80, strip_ansi: bool = False) -> None",
+          "description": "Spawn a PTY session.",
+          "parameters": [
+            {
+              "name": "cmd",
+              "type": "str",
+              "description": "Command to run in the PTY.",
+              "required": false,
+              "default": "bash"
+            },
+            {
+              "name": "rows",
+              "type": "int",
+              "description": "Terminal rows.",
+              "required": false,
+              "default": 24
+            },
+            {
+              "name": "cols",
+              "type": "int",
+              "description": "Terminal columns.",
+              "required": false,
+              "default": 80
+            },
+            {
+              "name": "strip_ansi",
+              "type": "bool",
+              "description": "Strip ANSI escape sequences from output.",
+              "required": false,
+              "default": false
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when PTY is spawned." },
+          "raises": ["AuthenticationError", "TimeoutError", "ChannelError"],
+          "example": "await client.pty_spawn('bash', rows=40, cols=120)",
+          "docs": "API.md#pty_spawn"
+        },
+        {
+          "name": "pty_write",
+          "signature": "async pty_write(data: str) -> None",
+          "description": "Send input to the PTY session.",
+          "parameters": [
+            {
+              "name": "data",
+              "type": "str",
+              "description": "Data to write to the PTY.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when written." },
+          "raises": ["TimeoutError", "ChannelError"],
+          "example": "await client.pty_write('ls -la\\n')",
+          "docs": "API.md#pty_write"
+        },
+        {
+          "name": "pty_resize",
+          "signature": "async pty_resize(rows: int, cols: int) -> None",
+          "description": "Resize the PTY terminal.",
+          "parameters": [
+            {
+              "name": "rows",
+              "type": "int",
+              "description": "New row count.",
+              "required": true
+            },
+            {
+              "name": "cols",
+              "type": "int",
+              "description": "New column count.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when resized." },
+          "raises": ["TimeoutError", "ChannelError"],
+          "example": "await client.pty_resize(48, 160)",
+          "docs": "API.md#pty_resize"
+        },
+        {
+          "name": "pty_signal",
+          "signature": "async pty_signal(sig: str) -> None",
+          "description": "Send a signal to the PTY process.",
+          "parameters": [
+            {
+              "name": "sig",
+              "type": "str",
+              "description": "Signal name (e.g., 'INT', 'TERM', 'KILL').",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Resolves when signal is sent." },
+          "raises": ["TimeoutError", "ChannelError"],
+          "example": "await client.pty_signal('INT')",
+          "docs": "API.md#pty_signal"
+        },
+        {
+          "name": "pty_close",
+          "signature": "async pty_close() -> None",
+          "description": "Close the PTY session.",
+          "parameters": [],
+          "returns": { "type": "None", "description": "Resolves when closed." },
+          "raises": ["TimeoutError"],
+          "example": "await client.pty_close()",
+          "docs": "API.md#pty_close"
+        },
+        {
+          "name": "on_pty",
+          "signature": "on_pty(callback: Callable[[PtyEvent], Any]) -> None",
+          "description": "Register a callback for PTY events (output, exit).",
+          "parameters": [
+            {
+              "name": "callback",
+              "type": "Callable[[PtyEvent], Any]",
+              "description": "Function called with each PtyEvent.",
+              "required": true
+            }
+          ],
+          "returns": { "type": "None", "description": "Returns immediately." },
+          "raises": [],
+          "example": "def on_output(event):\n    if event.type == 'output':\n        print(event.data, end='')\nclient.on_pty(on_output)",
+          "docs": "API.md#on_pty"
+        }
+      ],
+      "properties": [
+        {
+          "name": "is_connected",
+          "type": "bool",
+          "description": "Whether the client is currently connected to a server."
+        },
+        {
+          "name": "is_authenticated",
+          "type": "bool",
+          "description": "Whether the client has successfully authenticated."
+        }
+      ],
+      "async_context_manager": true
+    },
+    {
+      "name": "Transport",
+      "module": "bashclient.transport",
+      "description": "Abstract base class for transport backends.",
+      "abstract": true,
+      "methods": [
+        {
+          "name": "connect",
+          "signature": "async connect(**kwargs) -> None",
+          "description": "Establish connection."
+        },
+        {
+          "name": "read_line",
+          "signature": "async read_line() -> bytes",
+          "description": "Read one newline-terminated line."
+        },
+        {
+          "name": "write",
+          "signature": "async write(data: bytes) -> None",
+          "description": "Write data."
+        },
+        {
+          "name": "close",
+          "signature": "async close() -> None",
+          "description": "Close connection."
+        }
+      ],
+      "properties": [
+        {
+          "name": "is_connected",
+          "type": "bool",
+          "description": "Connection state."
+        }
+      ]
+    },
+    {
+      "name": "UnixSocketTransport",
+      "module": "bashclient.transport",
+      "description": "Transport via Unix domain socket.",
+      "extends": "Transport"
+    },
+    {
+      "name": "StdioTransport",
+      "module": "bashclient.transport",
+      "description": "Transport via subprocess stdin/stdout.",
+      "extends": "Transport"
+    },
+    {
+      "name": "FdTransport",
+      "module": "bashclient.transport",
+      "description": "Transport via pre-opened file descriptors.",
+      "extends": "Transport"
+    },
+    {
+      "name": "NamedPipeTransport",
+      "module": "bashclient.transport",
+      "description": "Transport via Windows Named Pipe.",
+      "extends": "Transport"
+    }
+  ],
+  "types": [
+    {
+      "name": "EvalResult",
+      "module": "bashclient.types",
+      "description": "Result of a command evaluation.",
+      "fields": [
+        { "name": "stdout", "type": "str", "description": "Standard output." },
+        { "name": "stderr", "type": "str", "description": "Standard error." },
+        { "name": "exit_code", "type": "int", "description": "Exit code." },
+        { "name": "duration", "type": "Optional[float]", "description": "Execution duration in seconds.", "default": null }
+      ]
+    },
+    {
+      "name": "PingResult",
+      "module": "bashclient.types",
+      "description": "Result of a ping operation.",
+      "fields": [
+        { "name": "latency", "type": "float", "description": "Round-trip latency in seconds." },
+        { "name": "server_version", "type": "str", "description": "Server version string." }
+      ]
+    },
+    {
+      "name": "AuthResult",
+      "module": "bashclient.types",
+      "description": "Result of authentication.",
+      "fields": [
+        { "name": "success", "type": "bool", "description": "Whether authentication succeeded." },
+        { "name": "message", "type": "str", "description": "Server message." }
+      ]
+    },
+    {
+      "name": "VarInfo",
+      "module": "bashclient.types",
+      "description": "Information about a shell variable.",
+      "fields": [
+        { "name": "name", "type": "str", "description": "Variable name." },
+        { "name": "value", "type": "Optional[str]", "description": "Variable value.", "default": null },
+        { "name": "type", "type": "str", "description": "Variable type (string, array, assoc, integer, etc.).", "default": "string" },
+        { "name": "attributes", "type": "List[str]", "description": "Variable attributes (exported, readonly, etc.).", "default": [] }
+      ]
+    },
+    {
+      "name": "FuncInfo",
+      "module": "bashclient.types",
+      "description": "Information about a shell function.",
+      "fields": [
+        { "name": "name", "type": "str", "description": "Function name." },
+        { "name": "body", "type": "str", "description": "Function body (shell code)." }
+      ]
+    },
+    {
+      "name": "AliasInfo",
+      "module": "bashclient.types",
+      "description": "Information about a shell alias.",
+      "fields": [
+        { "name": "name", "type": "str", "description": "Alias name." },
+        { "name": "value", "type": "str", "description": "Alias expansion value." }
+      ]
+    },
+    {
+      "name": "TrapInfo",
+      "module": "bashclient.types",
+      "description": "Information about a signal trap.",
+      "fields": [
+        { "name": "signal", "type": "str", "description": "Signal name." },
+        { "name": "action", "type": "str", "description": "Trap action (shell command)." }
+      ]
+    },
+    {
+      "name": "InspectResult",
+      "module": "bashclient.types",
+      "description": "Result of inspecting a namespace.",
+      "fields": [
+        { "name": "namespace", "type": "str", "description": "Namespace that was inspected." },
+        { "name": "items", "type": "List[Any]", "description": "List of items (VarInfo, FuncInfo, AliasInfo, or TrapInfo depending on namespace)." }
+      ]
+    },
+    {
+      "name": "ObserveEvent",
+      "module": "bashclient.types",
+      "description": "Command observation event.",
+      "fields": [
+        { "name": "type", "type": "str", "description": "Event type: 'pre_command' or 'post_command'." },
+        { "name": "command", "type": "str", "description": "The command string." },
+        { "name": "cwd", "type": "Optional[str]", "description": "Current working directory (detailed level).", "default": null },
+        { "name": "timestamp", "type": "Optional[float]", "description": "Event timestamp (Unix epoch seconds).", "default": null },
+        { "name": "exit_code", "type": "Optional[int]", "description": "Exit code (post_command only).", "default": null },
+        { "name": "duration", "type": "Optional[float]", "description": "Command duration in seconds (post_command only).", "default": null }
+      ]
+    },
+    {
+      "name": "DebugEvent",
+      "module": "bashclient.types",
+      "description": "Debug event (breakpoint hit or step completion).",
+      "fields": [
+        { "name": "type", "type": "str", "description": "Event type: 'breakpoint_hit' or 'step_complete'." },
+        { "name": "location", "type": "Optional[str]", "description": "Source location.", "default": null },
+        { "name": "command_ast", "type": "Optional[dict]", "description": "Current command AST.", "default": null },
+        { "name": "breakpoint_id", "type": "Optional[int]", "description": "Breakpoint ID (breakpoint_hit only).", "default": null }
+      ]
+    },
+    {
+      "name": "BreakpointInfo",
+      "module": "bashclient.types",
+      "description": "Information about a debugger breakpoint.",
+      "fields": [
+        { "name": "id", "type": "int", "description": "Breakpoint ID." },
+        { "name": "type", "type": "str", "description": "Breakpoint type: 'command', 'line', or 'function'." },
+        { "name": "target", "type": "str", "description": "Breakpoint target." },
+        { "name": "enabled", "type": "bool", "description": "Whether the breakpoint is active.", "default": true }
+      ]
+    },
+    {
+      "name": "PtyEvent",
+      "module": "bashclient.types",
+      "description": "PTY session event.",
+      "fields": [
+        { "name": "type", "type": "str", "description": "Event type: 'output' or 'exit'." },
+        { "name": "data", "type": "Optional[str]", "description": "Output data (output events).", "default": null },
+        { "name": "exit_code", "type": "Optional[int]", "description": "Process exit code (exit events).", "default": null }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "name": "BashClientError",
+      "module": "bashclient.errors",
+      "description": "Base exception for all bashclient errors.",
+      "extends": "Exception"
+    },
+    {
+      "name": "ConnectionError",
+      "module": "bashclient.errors",
+      "description": "Transport connection failures (socket not found, permission denied, connection refused).",
+      "extends": "BashClientError"
+    },
+    {
+      "name": "AuthenticationError",
+      "module": "bashclient.errors",
+      "description": "Authentication failures (wrong token, not authenticated).",
+      "extends": "BashClientError"
+    },
+    {
+      "name": "ProtocolError",
+      "module": "bashclient.errors",
+      "description": "Wire protocol errors (malformed frames, unexpected data).",
+      "extends": "BashClientError"
+    },
+    {
+      "name": "TimeoutError",
+      "module": "bashclient.errors",
+      "description": "Operation timeout.",
+      "extends": "BashClientError"
+    },
+    {
+      "name": "ChannelError",
+      "module": "bashclient.errors",
+      "description": "Channel-level errors (e.g., eval returned error op).",
+      "extends": "BashClientError"
+    }
+  ],
+  "constants": [
+    { "name": "CHAN_CONTROL", "value": 0, "description": "Control channel ID." },
+    { "name": "CHAN_COMMAND", "value": 1, "description": "Command channel ID." },
+    { "name": "CHAN_STATE", "value": 2, "description": "State channel ID." },
+    { "name": "CHAN_OBSERVE", "value": 3, "description": "Observe channel ID." },
+    { "name": "CHAN_DEBUG", "value": 4, "description": "Debug channel ID." },
+    { "name": "CHAN_PTY", "value": 5, "description": "PTY channel ID." },
+    { "name": "__version__", "value": "0.1.0", "description": "Package version." }
+  ],
+  "examples": [
+    {
+      "title": "Basic Eval",
+      "file": "examples/eval.py",
+      "description": "Connect to bash-server, authenticate, evaluate commands, and display results.",
+      "channels": ["CONTROL", "COMMAND"],
+      "transport": "unix_socket"
+    },
+    {
+      "title": "Observation",
+      "file": "examples/observe.py",
+      "description": "Subscribe to command observation events and log pre/post command execution.",
+      "channels": ["CONTROL", "COMMAND", "OBSERVE"],
+      "transport": "unix_socket"
+    },
+    {
+      "title": "Debugger",
+      "file": "examples/debugger.py",
+      "description": "Set breakpoints, step through commands, and inspect AST.",
+      "channels": ["CONTROL", "COMMAND", "DEBUG"],
+      "transport": "stdio"
+    },
+    {
+      "title": "PTY Session",
+      "file": "examples/pty.py",
+      "description": "Spawn an interactive PTY session, send input, and receive output.",
+      "channels": ["CONTROL", "PTY"],
+      "transport": "unix_socket"
+    }
+  ]
+}

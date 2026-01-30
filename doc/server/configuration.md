@@ -1,345 +1,341 @@
-# bash-server Configuration and Operations Guide
+# bash-server Configuration
 
-**Audience:** System administrators, operators, and integration developers.
+## Command-Line Options
 
-## Command-Line Reference
-
-### bash-server
+### Synopsis
 
 ```
 bash-server [OPTIONS]
 ```
 
-| Option | Short | Argument | Default | Description |
-|--------|-------|----------|---------|-------------|
-| `--socket PATH` | `-s` | Required | (auto) | Unix socket path |
-| `--daemon` | `-d` | None | Off | Daemonize (background) |
-| `--pidfile PATH` | `-p` | Required | None | Write PID to file |
-| `--max-clients N` | `-m` | Required | 10 | Maximum simultaneous clients (reserved) |
-| `--no-peercred` | `-P` | None | Off | Disable Cygwin credential handshake |
-| `--verbose` | `-v` | None | Off | Verbose logging to stderr |
-| `--help` | `-h` | None | — | Print usage and exit |
-| `--version` | `-V` | None | — | Print version and exit |
+### Option Reference
 
-### bashclient
+#### Transport Options
 
+| Short | Long | Argument | Description |
+|-------|------|----------|-------------|
+| `-s` | `--socket` | PATH | Unix domain socket path |
+| `-S` | `--stdio` | -- | Use stdin/stdout (single session) |
+| `-f` | `--fd` | N | Use inherited file descriptor N (single session) |
+| `-W` | `--named-pipe` | NAME | Use Windows Named Pipe (Cygwin only) |
+
+**Transport mode selection:**
+
+The server operates in exactly one transport mode.  If multiple transport
+options are specified, the last one wins.
+
+| Mode | Flag | Accepts | Fork model |
+|------|------|---------|------------|
+| Socket (default) | `--socket` or none | Multiple clients | Fork-per-session |
+| Stdio | `--stdio` | Single session | No fork |
+| Fd | `--fd N` | Single session | No fork |
+| Named Pipe | `--named-pipe NAME` | Multiple clients | Sequential (no fork) |
+
+#### Daemon Options
+
+| Short | Long | Argument | Description |
+|-------|------|----------|-------------|
+| `-d` | `--daemon` | -- | Run as background daemon (double-fork, setsid) |
+| `-p` | `--pidfile` | PATH | Write PID to file (useful with --daemon) |
+
+`--daemon` is incompatible with `--stdio` and `--fd` (the server will exit
+with an error if both are specified).
+
+When daemonizing, the server:
+1. Forks twice (to prevent acquiring a controlling terminal)
+2. Calls `setsid()` to become a session leader
+3. Changes working directory to `/`
+4. Redirects stdin/stdout/stderr to `/dev/null`
+
+#### Connection Options
+
+| Short | Long | Argument | Description |
+|-------|------|----------|-------------|
+| `-m` | `--max-clients` | N | Maximum simultaneous client sessions (default: 10) |
+| `-P` | `--no-peercred` | -- | Disable Cygwin SO_PEERCRED credential handshake |
+
+The `--max-clients` limit applies only to socket transport mode.  When the
+limit is reached, new connections receive `ERR server busy (max clients reached)`
+and are closed.
+
+`--no-peercred` exists for compatibility with non-C clients (specifically
+Python's `socket` module) on Cygwin, where the `SO_PEERCRED` credential
+handshake bytes leak into the application data stream.  **Do NOT use** with
+C clients or `bashclient` -- it is not needed and may corrupt the protocol.
+Consider using `--named-pipe` instead, which avoids the issue entirely.
+
+#### Authentication Options
+
+| Short | Long | Argument | Description |
+|-------|------|----------|-------------|
+| `-A` | `--auth-fd` | N | Write authentication token to fd N |
+
+Token delivery depends on the transport mode:
+
+| Transport | Token delivery | Default |
+|-----------|---------------|---------|
+| Socket | Written to `<socket-path>.token` (mode 0600) | Always |
+| Stdio | Written to `--auth-fd` or stderr | stderr |
+| Fd | Written to `--auth-fd` or stderr | stderr |
+| Named Pipe | Written to `$XDG_RUNTIME_DIR/bash-server/<name>.token` or `/tmp/bash-server-<uid>/<name>.token` | Always |
+
+In stdio/fd modes, the token is delivered as a line:
 ```
-bashclient [OPTIONS]
+TOKEN <64-hex-chars>\n
 ```
 
-| Option | Short | Argument | Default | Description |
-|--------|-------|----------|---------|-------------|
-| `--socket PATH` | `-s` | Required | — | Unix socket path (required) |
-| `--auth TOKEN` | `-a` | Required | — | Authentication token (required) |
-| `--eval CMD` | `-e` | Required | — | Execute single command |
-| `--file SCRIPT` | `-f` | Required | — | Execute commands from file |
-| `--interactive` | `-i` | None | Auto | Interactive prompt mode |
-| `--verbose` | `-v` | None | Off | Verbose output |
-| `--help` | `-h` | None | — | Print usage and exit |
-| `--version` | `-V` | None | — | Print version and exit |
+The `--auth-fd` option redirects this line to a specific file descriptor.
+This is useful when stdout is used for protocol data (stdio mode) and you
+need the token on a separate channel (e.g., fd 3):
 
-**Mode selection:**
-- If `--eval` is given, execute that command and exit.
-- If `--file` is given, execute each line of the file and exit.
-- If `--interactive` is given, enter interactive prompt mode.
-- If none specified and stdin is a TTY, default to interactive mode.
-- If none specified and stdin is not a TTY, print an error and exit.
+```bash
+bash-server --stdio --auth-fd 3  3>token.txt
+```
+
+#### Shell Initialization Options
+
+| Short | Long | Argument | Description |
+|-------|------|----------|-------------|
+| `-l` | `--login` | -- | Login shell initialization |
+| | `--norc` | -- | Skip sourcing `~/.bashrc` |
+| | `--noprofile` | -- | Skip sourcing `/etc/profile` and `~/.bash_profile` |
+| `-I` | `--init` | SCRIPT | Source additional init script per session |
+
+These options control how the Bash interpreter is initialized when a session
+is first authenticated.  They mirror standard Bash startup behavior:
+
+**Default (no flags):**
+- Source `~/.bashrc` (if it exists)
+
+**Login mode (`--login`):**
+- Source `/etc/profile` (if it exists)
+- Source the first found of: `~/.bash_profile`, `~/.bash_login`, `~/.profile`
+- Source `~/.bashrc` (unless `--norc`)
+
+**`--norc`:**
+- Skip `~/.bashrc`
+
+**`--noprofile`:**
+- Skip `/etc/profile` and `~/.bash_profile` / `~/.bash_login` / `~/.profile`
+
+**`--init SCRIPT`:**
+- After all standard startup files, source the specified script
+- Useful for loading project-specific functions, aliases, and variables
+
+All sourcing uses bash's `source_file()` function, which properly handles
+`return` statements in sourced scripts.
+
+#### Information Options
+
+| Short | Long | Description |
+|-------|------|-------------|
+| `-v` | `--verbose` | Verbose output to stderr |
+| `-h` | `--help` | Print usage and exit |
+| `-V` | `--version` | Print version and exit |
+
+`--verbose` prints diagnostic messages to stderr:
+- Socket/pipe path and token file location
+- Client connect/disconnect events
+- Session fork PID and client count
+- Child exit status
+- Shutdown confirmation
 
 ## Socket Path Resolution
 
-The server resolves its socket path using a priority hierarchy.  The first
-match wins:
+The socket path is resolved using a five-level hierarchy.  The first match
+wins:
 
 | Priority | Source | Example |
 |----------|--------|---------|
 | 1 | `--socket PATH` (CLI) | `--socket /run/bash-server/sock` |
-| 2 | `$BASH_SERVER_SOCKET` (env) | `export BASH_SERVER_SOCKET=/tmp/my.sock` |
-| 3 | `~/.bash-serverrc` (config file) | `socket /custom/path/sock` |
+| 2 | `$BASH_SERVER_SOCKET` (environment) | `export BASH_SERVER_SOCKET=/tmp/my-sock` |
+| 3 | `socket` directive in `~/.bash-serverrc` | `socket /home/user/.local/bash-server/sock` |
 | 4 | `$XDG_RUNTIME_DIR/bash-server/sock` | `/run/user/1000/bash-server/sock` |
-| 5 | `/tmp/bash-server-<uid>/sock` | `/tmp/bash-server-1000/sock` |
+| 5 | `/tmp/bash-server-<uid>/sock` (fallback) | `/tmp/bash-server-1000/sock` |
 
-### Default Path Behavior
+At levels 4 and 5, the server creates the parent directory (mode `0700`) if
+it does not exist.  The socket file itself is created with mode `0600`.
 
-On a typical Cygwin system without `$XDG_RUNTIME_DIR`:
+## Config File
 
+**Path:** `~/.bash-serverrc`
+
+**Format:** One directive per line.  `#` introduces a comment.  Leading and
+trailing whitespace is ignored.
+
+**Supported directives:**
+
+| Directive | Value | Description |
+|-----------|-------|-------------|
+| `socket` | PATH | Unix socket path (same as `--socket`) |
+
+CLI options take precedence over config file directives.
+
+**Example `~/.bash-serverrc`:**
 ```
-Socket: /tmp/bash-server-<uid>/sock
-Token:  /tmp/bash-server-<uid>/sock.token
-```
-
-On a Linux system with systemd user session:
-
-```
-Socket: /run/user/<uid>/bash-server/sock
-Token:  /run/user/<uid>/bash-server/sock.token
-```
-
-### Directory Creation
-
-The server automatically creates the parent directory for the socket
-with mode `0700` if it does not exist.  It will not create nested
-parent directories — only the immediate parent.
-
-## Configuration File
-
-### Location
-
-```
-~/.bash-serverrc
-```
-
-The file is optional.  If absent, no error is raised.
-
-### Format
-
-Plain text, one directive per line:
-
-```
-# Comment lines start with #
-# Blank lines are ignored
-
-socket /path/to/socket
-```
-
-### Directives
-
-| Directive | Arguments | Description |
-|-----------|-----------|-------------|
-| `socket` | PATH | Unix socket path |
-
-**Parsing rules:**
-- Lines beginning with `#` (after optional whitespace) are comments.
-- Blank lines and whitespace-only lines are ignored.
-- Leading and trailing whitespace on value is trimmed.
-- Directives are case-sensitive.
-- Only the first matching directive is used (no duplicate handling needed).
-- CLI and environment settings take precedence — the config file only
-  fills in values not already set.
-
-### Example
-
-```bash
-# ~/.bash-serverrc
-# Use XDG-style runtime directory
+# Use XDG runtime directory
 socket /run/user/1000/bash-server/sock
 ```
-
-## Authentication
-
-### Token Generation
-
-On startup, the server generates a 256-bit (32-byte) random token:
-
-1. Read 32 bytes from `/dev/urandom`.
-2. Hex-encode to 64 lowercase hexadecimal characters.
-3. Write to `<socket-path>.token` (mode `0600`, `O_CREAT | O_EXCL`).
-4. Append a trailing newline for shell convenience (`cat`, `read`).
-5. Zero the raw random bytes on the stack.
-
-### Token File
-
-| Property | Value |
-|----------|-------|
-| Path | `<socket-path>.token` |
-| Permissions | `0600` (owner read/write only) |
-| Contents | 64 hex characters + newline (65 bytes total) |
-| Lifecycle | Created on startup, deleted on shutdown |
-| Creation mode | `O_WRONLY | O_CREAT | O_EXCL` (fails if exists) |
-
-Stale token files from previous runs are unlinked before creation.
-
-### Client Authentication
-
-```bash
-# Read the token
-TOKEN=$(cat /tmp/bash-server-$(id -u)/sock.token)
-
-# Use with bashclient
-bashclient -s /tmp/bash-server-$(id -u)/sock -a "$TOKEN" -e 'whoami'
-
-# Use with raw protocol
-echo -e "AUTH $TOKEN\nEVAL whoami\nQUIT" | socat - UNIX-CONNECT:/tmp/bash-server-$(id -u)/sock
-```
-
-## Daemon Mode
-
-### Starting as a Daemon
-
-```bash
-bash-server --daemon --pidfile /tmp/bash-server.pid --verbose
-```
-
-**Daemonization process (double-fork):**
-
-1. First `fork()` — parent exits.
-2. Child calls `setsid()` to become session leader.
-3. Second `fork()` — first child exits (prevents acquiring controlling terminal).
-4. Grandchild calls `chdir("/")`.
-5. Close stdin/stdout/stderr.
-6. Redirect all three to `/dev/null`.
-
-**Note:** When `--daemon` is combined with `--verbose`, verbose messages are
-written to stderr *before* daemonization.  After daemonization, stderr goes
-to `/dev/null` and verbose output is lost.  For production daemon logging,
-use an external process manager or redirect stderr before starting.
-
-### PID File
-
-When `--pidfile` is specified:
-
-| Property | Value |
-|----------|-------|
-| Contents | PID as decimal integer + newline |
-| Created | After daemonization (contains daemon PID, not parent) |
-| Deleted | On clean shutdown (SIGINT/SIGTERM) |
-| Permissions | Default umask |
-
-### Stopping a Daemon
-
-```bash
-# Using PID file
-kill $(cat /tmp/bash-server.pid)
-
-# Using process name
-kill $(pgrep bash-server)
-
-# Verify stopped
-ls /tmp/bash-server-$(id -u)/sock  # Should not exist
-```
-
-## Shutdown Behavior
-
-On receipt of SIGINT or SIGTERM, the server:
-
-1. Sets `server_running = 0` (signal handler).
-2. The `accept()` call returns `EINTR` (SA_RESTART not set for these signals).
-3. The main loop exits.
-4. `server_shutdown()` is called:
-   - Closes the listening socket file descriptor.
-   - Unlinks the socket file.
-   - Unlinks the token file.
-   - Unlinks the PID file (if any).
-   - Reaps zombie child processes.
-
-**If the server crashes** (SIGSEGV, SIGABRT, power loss):
-- The socket file remains on disk (stale).
-- The token file remains on disk (stale).
-- The PID file remains on disk (stale PID).
-- On next startup, the server unlinks the stale socket file before binding.
-- The token file is unlinked and re-created with `O_EXCL`.
-
-## File Permissions Summary
-
-| File | Created by | Mode | Purpose |
-|------|-----------|------|---------|
-| Socket directory | `ensure_directory()` | `0700` | Contains socket and token |
-| Socket file | `bind()` + `chmod()` | `0600` | Unix domain socket |
-| Token file | `open(O_CREAT\|O_EXCL)` | `0600` | Authentication token |
-| PID file | `fopen("w")` | umask | Daemon PID |
-
-All security-sensitive files are restricted to owner access only.
 
 ## Environment Variables
 
 | Variable | Used by | Description |
 |----------|---------|-------------|
-| `BASH_SERVER_SOCKET` | Server | Socket path (priority 2) |
-| `XDG_RUNTIME_DIR` | Server | Base for default socket path (priority 4) |
-| `HOME` | Server | Used to locate `~/.bash-serverrc` |
+| `BASH_SERVER_SOCKET` | Server + client | Unix socket path (priority 2) |
+| `BASH_SERVER_TOKEN` | Client | Authentication token |
+| `XDG_RUNTIME_DIR` | Server | Base directory for socket/token files (priority 4) |
+| `HOME` | Server | Home directory for `~/.bash-serverrc` and `~/.bashrc` |
+| `TERM` | PTY sessions | Terminal type (set to `xterm-256color` if unset in PTY child) |
 
-## Operational Patterns
+## Transport Modes
 
-### Health Check
+### Socket Mode (default)
+
+The default and most capable transport.  Supports multiple concurrent
+sessions via fork-per-session.
 
 ```bash
-SOCK=/tmp/bash-server-$(id -u)/sock
-echo PING | socat - UNIX-CONNECT:$SOCK
-# Expected: PONG
+# Start with defaults
+bash-server
+
+# Start with explicit socket path
+bash-server --socket /tmp/my-server.sock
+
+# Start as daemon
+bash-server --daemon --pidfile /tmp/bash-server.pid
 ```
 
-Or via bashclient:
+The server creates a `SOCK_STREAM` Unix domain socket, binds it, and
+listens with a backlog.  Each accepted connection is forked into a child
+process that handles the session independently.
+
+Token is written to `<socket-path>.token` (mode `0600`).
+
+### Stdio Mode
+
+Single-session transport for subprocess integration.  The parent process
+launches `bash-server --stdio` and communicates over the child's stdin
+(server reads) and stdout (server writes).
 
 ```bash
-# No direct PING support in bashclient, but a trivial EVAL works:
-bashclient -s $SOCK -a $(cat ${SOCK}.token) -e 'echo ok'
+# Basic stdio mode
+bash-server --stdio
+
+# With token on fd 3
+bash-server --stdio --auth-fd 3
+
+# Typical parent process usage (pseudocode):
+#   pipe(stdin_pipe)
+#   pipe(stdout_pipe)
+#   pipe(token_pipe)   # fd 3
+#   fork + exec("bash-server", "--stdio", "--auth-fd", "3")
+#   read token from token_pipe
+#   write protocol commands to stdin_pipe
+#   read responses from stdout_pipe
 ```
 
-### Scripted Use
+No socket file or token file is created.  The token is delivered via
+`--auth-fd` (default: stderr).
+
+### Fd Mode
+
+Single-session transport for socketpair integration.  The parent creates
+a `socketpair()`, passes one end as an inherited fd, and communicates
+bidirectionally over a single fd.
 
 ```bash
-#!/bin/bash
+# Use inherited fd 4
+bash-server --fd 4
+
+# With separate token delivery fd
+bash-server --fd 4 --auth-fd 5
+```
+
+This is useful when the parent process creates a Unix socketpair:
+```c
+int sv[2];
+socketpair(AF_UNIX, SOCK_STREAM, 0, sv);
+// sv[0] = parent end, sv[1] = child end (becomes fd 4)
+```
+
+### Named Pipe Mode (Cygwin only)
+
+Windows Named Pipes bypass Cygwin's `AF_UNIX`-over-TCP-loopback emulation.
+
+```bash
+# Start with named pipe
+bash-server --named-pipe myserver
+```
+
+This creates a Windows Named Pipe at `\\.\pipe\bash-server-myserver` with
+an owner-only DACL (equivalent to `chmod 0600`).
+
+Clients connect using the Win32 `CreateFile()` API or any Named Pipe client.
+The pipe name is always prefixed with `bash-server-` to avoid collisions.
+
+**Differences from socket mode:**
+- No `SO_PEERCRED` issues (Named Pipes have native security)
+- Sessions are handled sequentially (no fork -- see architecture.md for why)
+- Token file is at `$XDG_RUNTIME_DIR/bash-server/<name>.token` or `/tmp/bash-server-<uid>/<name>.token`
+- The `--no-peercred` flag is not needed (and has no effect)
+
+## Usage Examples
+
+### Development Setup
+
+```bash
+# Start verbose server with login shell init
+bash-server --verbose --login
+
+# In another terminal, connect
 SOCK=/tmp/bash-server-$(id -u)/sock
 TOKEN=$(cat ${SOCK}.token)
-
-# Execute commands from a script
-bashclient -s "$SOCK" -a "$TOKEN" -f commands.sh
-
-# Or pipe commands
-echo 'echo hello' | bashclient -s "$SOCK" -a "$TOKEN" -f /dev/stdin
+bashclient --socket "$SOCK" --auth "$TOKEN" --interactive
 ```
 
-### Process Manager Integration (systemd example)
-
-```ini
-[Unit]
-Description=Bash Server Daemon
-After=network.target
-
-[Service]
-Type=forking
-ExecStart=/usr/local/bin/bash-server --daemon --pidfile /run/bash-server.pid
-ExecStop=/bin/kill -TERM $MAINPID
-PIDFile=/run/bash-server.pid
-Restart=on-failure
-User=appuser
-RuntimeDirectory=bash-server
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### Cygwin Service (cygrunsrv)
+### Daemon Deployment
 
 ```bash
-cygrunsrv --install bash-server \
-  --path /usr/local/bin/bash-server \
-  --args "--verbose" \
-  --user SYSTEM \
-  --desc "Bash Server Daemon"
+# Start as daemon with custom socket and init script
+bash-server \
+    --daemon \
+    --socket /run/bash-server/sock \
+    --pidfile /run/bash-server/pid \
+    --login \
+    --init /etc/bash-server/init.sh \
+    --max-clients 20
 
-cygrunsrv --start bash-server
-cygrunsrv --stop bash-server
+# Stop
+kill $(cat /run/bash-server/pid)
 ```
 
-Note: For Cygwin service use, do **not** pass `--daemon` since cygrunsrv
-manages the process lifecycle.  Use `--verbose` for logging to the
-service's stdout/stderr which cygrunsrv captures.
+### Subprocess Integration (stdio)
 
-## Troubleshooting
+```bash
+# Python parent process example:
+#   import subprocess
+#   proc = subprocess.Popen(
+#       ['bash-server', '--stdio', '--auth-fd', '3'],
+#       stdin=subprocess.PIPE,
+#       stdout=subprocess.PIPE,
+#       pass_fds=(3,)
+#   )
+#   # Read token from fd 3
+#   # Write AUTH command to proc.stdin
+#   # Read responses from proc.stdout
+```
 
-### Cannot Connect
+### Named Pipe (Cygwin)
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `connect: No such file or directory` | Socket file missing | Start the server |
-| `connect: Connection refused` | Stale socket file | Remove file, restart server |
-| `connect: Permission denied` | Socket permissions | Check file ownership/mode |
-| `ECONNABORTED` (errno 113) | Cygwin peercred race | Use `--no-peercred` flag |
+```bash
+# Start server
+bash-server --named-pipe dev --verbose
 
-### Authentication Failures
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `ERR invalid token` | Wrong token | Re-read token file |
-| `ERR token required` | Empty AUTH argument | Check token variable |
-| Token file missing | Server not running or crashed | Restart server |
-| Token file has wrong permissions | Manual tampering | Restart server to regenerate |
-
-### Server Won't Start
-
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `cannot create socket: Address already in use` | Another server running | Stop existing server |
-| `cannot create <dir>: Permission denied` | Directory permissions | Fix parent directory permissions |
-| `cannot open /dev/urandom` | Restricted environment | Ensure /dev/urandom is available |
-| `short read from /dev/urandom` | System entropy issue | Rare; check kernel entropy pool |
+# Connect from Python (Windows):
+#   import win32pipe, win32file
+#   handle = win32file.CreateFile(
+#       r'\\.\pipe\bash-server-dev',
+#       win32file.GENERIC_READ | win32file.GENERIC_WRITE,
+#       0, None, win32file.OPEN_EXISTING, 0, None
+#   )
+```

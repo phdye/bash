@@ -1,0 +1,541 @@
+{
+  "package": {
+    "language": "java",
+    "group": "org.gnu.bash",
+    "artifact": "bashclient",
+    "version": "0.1.0",
+    "javaVersion": "11",
+    "license": "GPL-3.0-or-later",
+    "rootPackage": "org.gnu.bash.client",
+    "description": "Java client library for bash-server persistent evaluation daemon"
+  },
+  "dependencies": {
+    "runtime": [
+      {
+        "group": "com.kohlschutter.junixsocket",
+        "artifact": "junixsocket-common",
+        "version": "2.9.1",
+        "purpose": "Unix domain socket support"
+      },
+      {
+        "group": "com.kohlschutter.junixsocket",
+        "artifact": "junixsocket-native-common",
+        "version": "2.9.1",
+        "purpose": "Platform-specific native libraries for junixsocket"
+      },
+      {
+        "group": "com.fasterxml.jackson.core",
+        "artifact": "jackson-databind",
+        "version": "2.17.0",
+        "purpose": "JSON serialization and deserialization"
+      },
+      {
+        "group": "com.fasterxml.jackson.core",
+        "artifact": "jackson-core",
+        "version": "2.17.0",
+        "purpose": "Jackson core streaming API"
+      },
+      {
+        "group": "com.fasterxml.jackson.core",
+        "artifact": "jackson-annotations",
+        "version": "2.17.0",
+        "purpose": "Jackson annotation support"
+      }
+    ],
+    "test": [
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter",
+        "version": "5.10.2",
+        "purpose": "JUnit 5 test framework"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter-api",
+        "version": "5.10.2",
+        "purpose": "JUnit 5 test API"
+      },
+      {
+        "group": "org.junit.jupiter",
+        "artifact": "junit-jupiter-params",
+        "version": "5.10.2",
+        "purpose": "JUnit 5 parameterized tests"
+      }
+    ]
+  },
+  "classes": {
+    "BashClient": {
+      "package": "org.gnu.bash.client",
+      "implements": ["java.lang.AutoCloseable"],
+      "description": "Main entry point for connecting to a bash-server instance",
+      "fields": [
+        {"name": "control", "type": "ControlChannel", "modifiers": "public final", "description": "Channel 0: auth, ping, disconnect, configure"},
+        {"name": "command", "type": "CommandChannel", "modifiers": "public final", "description": "Channel 1: eval, streaming output"},
+        {"name": "state", "type": "StateChannel", "modifiers": "public final", "description": "Channel 2: variables, functions, aliases, traps"},
+        {"name": "observe", "type": "ObserveChannel", "modifiers": "public final", "description": "Channel 3: pre/post command events"},
+        {"name": "debug", "type": "DebugChannel", "modifiers": "public final", "description": "Channel 4: breakpoints, stepping, AST"},
+        {"name": "pty", "type": "PtyChannel", "modifiers": "public final", "description": "Channel 5: pseudo-terminal"}
+      ],
+      "methods": [
+        {
+          "name": "connect",
+          "modifiers": "public static",
+          "parameters": [{"name": "socketPath", "type": "String"}],
+          "returns": "BashClient",
+          "throws": ["IOException"],
+          "description": "Creates a BashClient connected via Unix domain socket"
+        },
+        {
+          "name": "connectStdio",
+          "modifiers": "public static",
+          "parameters": [{"name": "args", "type": "String..."}],
+          "returns": "BashClient",
+          "throws": ["IOException"],
+          "description": "Creates a BashClient via subprocess stdin/stdout"
+        },
+        {
+          "name": "connectNamedPipe",
+          "modifiers": "public static",
+          "parameters": [{"name": "pipeName", "type": "String"}],
+          "returns": "BashClient",
+          "throws": ["IOException"],
+          "description": "Creates a BashClient via Windows Named Pipe"
+        },
+        {
+          "name": "auth",
+          "modifiers": "public",
+          "parameters": [{"name": "token", "type": "String"}],
+          "returns": "void",
+          "throws": ["BashClientException"],
+          "description": "Authenticates with the server's token"
+        },
+        {
+          "name": "eval",
+          "modifiers": "public",
+          "parameters": [{"name": "command", "type": "String"}],
+          "returns": "EvalResult",
+          "throws": ["BashClientException"],
+          "description": "Evaluates a bash command and returns the result"
+        },
+        {
+          "name": "ping",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "void",
+          "throws": ["BashClientException"],
+          "description": "Sends a ping and waits for pong"
+        },
+        {
+          "name": "isConnected",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "boolean",
+          "throws": [],
+          "description": "Returns whether the transport is open"
+        },
+        {
+          "name": "isAuthenticated",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "boolean",
+          "throws": [],
+          "description": "Returns whether authentication succeeded"
+        },
+        {
+          "name": "close",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "void",
+          "throws": ["IOException"],
+          "description": "Closes the connection and releases resources"
+        }
+      ]
+    },
+    "NdjsonProtocol": {
+      "package": "org.gnu.bash.client",
+      "description": "NDJSON wire protocol serialization and deserialization",
+      "methods": [
+        {
+          "name": "send",
+          "modifiers": "public",
+          "parameters": [
+            {"name": "channel", "type": "int"},
+            {"name": "payload", "type": "ObjectNode"}
+          ],
+          "returns": "void",
+          "throws": ["IOException"],
+          "description": "Sends a message on the specified channel (thread-safe)"
+        },
+        {
+          "name": "parse",
+          "modifiers": "public",
+          "parameters": [{"name": "line", "type": "String"}],
+          "returns": "ObjectNode",
+          "throws": ["BashClientException.ProtocolException"],
+          "description": "Parses a single NDJSON line"
+        },
+        {
+          "name": "createMessage",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "ObjectNode",
+          "throws": [],
+          "description": "Creates a new empty ObjectNode"
+        },
+        {
+          "name": "getMapper",
+          "modifiers": "public",
+          "parameters": [],
+          "returns": "ObjectMapper",
+          "throws": [],
+          "description": "Returns the shared Jackson ObjectMapper"
+        }
+      ]
+    },
+    "Transport": {
+      "package": "org.gnu.bash.client",
+      "kind": "interface",
+      "implements": ["java.io.Closeable"],
+      "description": "Abstract transport layer interface",
+      "methods": [
+        {
+          "name": "getInputStream",
+          "returns": "InputStream",
+          "throws": ["IOException"],
+          "description": "Returns input stream for reading server messages"
+        },
+        {
+          "name": "getOutputStream",
+          "returns": "OutputStream",
+          "throws": ["IOException"],
+          "description": "Returns output stream for sending client messages"
+        },
+        {
+          "name": "isOpen",
+          "returns": "boolean",
+          "throws": [],
+          "description": "Returns whether the transport is open"
+        },
+        {
+          "name": "close",
+          "returns": "void",
+          "throws": ["IOException"],
+          "description": "Closes the transport"
+        }
+      ]
+    }
+  },
+  "channels": {
+    "ControlChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 0,
+      "description": "Connection-level control operations",
+      "methods": [
+        {"name": "ping", "returns": "void", "throws": ["BashClientException"], "description": "Sends ping, waits for pong"},
+        {"name": "disconnect", "returns": "void", "throws": ["BashClientException"], "description": "Graceful disconnect"},
+        {
+          "name": "configure",
+          "parameters": [
+            {"name": "key", "type": "String"},
+            {"name": "value", "type": "String"}
+          ],
+          "returns": "void",
+          "throws": ["BashClientException"],
+          "description": "Sets session configuration"
+        }
+      ]
+    },
+    "CommandChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 1,
+      "description": "Command execution",
+      "methods": [
+        {
+          "name": "eval",
+          "parameters": [{"name": "command", "type": "String"}],
+          "returns": "EvalResult",
+          "throws": ["BashClientException"],
+          "description": "Evaluates a command with default timeout"
+        },
+        {
+          "name": "eval",
+          "parameters": [
+            {"name": "command", "type": "String"},
+            {"name": "timeout", "type": "Duration"}
+          ],
+          "returns": "EvalResult",
+          "throws": ["BashClientException"],
+          "description": "Evaluates with custom timeout"
+        },
+        {
+          "name": "eval",
+          "parameters": [
+            {"name": "command", "type": "String"},
+            {"name": "onStdout", "type": "Consumer<String>"},
+            {"name": "onStderr", "type": "Consumer<String>"}
+          ],
+          "returns": "EvalResult",
+          "throws": ["BashClientException"],
+          "description": "Evaluates with streaming output callbacks"
+        },
+        {
+          "name": "evalParsed",
+          "parameters": [{"name": "commandTree", "type": "ObjectNode"}],
+          "returns": "EvalResult",
+          "throws": ["BashClientException"],
+          "description": "Evaluates a pre-parsed COMMAND tree"
+        }
+      ]
+    },
+    "StateChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 2,
+      "description": "Environment state: variables, functions, aliases, traps",
+      "methods": [
+        {"name": "getVar", "parameters": [{"name": "name", "type": "String"}], "returns": "VarInfo", "throws": ["BashClientException"], "description": "Gets variable value and metadata"},
+        {"name": "setVar", "parameters": [{"name": "name", "type": "String"}, {"name": "value", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets a string variable"},
+        {"name": "setVar", "parameters": [{"name": "name", "type": "String"}, {"name": "value", "type": "String"}, {"name": "exported", "type": "boolean"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets a variable with export control"},
+        {"name": "setVar", "parameters": [{"name": "name", "type": "String"}, {"name": "values", "type": "String[]"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets an array variable"},
+        {"name": "unsetVar", "parameters": [{"name": "name", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Unsets a variable"},
+        {"name": "listVars", "parameters": [], "returns": "List<String>", "throws": ["BashClientException"], "description": "Lists all variable names"},
+        {"name": "listVars", "parameters": [{"name": "pattern", "type": "String"}], "returns": "List<String>", "throws": ["BashClientException"], "description": "Lists variables matching pattern"},
+        {"name": "getFunc", "parameters": [{"name": "name", "type": "String"}], "returns": "String", "throws": ["BashClientException"], "description": "Gets function definition"},
+        {"name": "setFunc", "parameters": [{"name": "name", "type": "String"}, {"name": "definition", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets a function"},
+        {"name": "unsetFunc", "parameters": [{"name": "name", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Unsets a function"},
+        {"name": "listFuncs", "parameters": [], "returns": "List<String>", "throws": ["BashClientException"], "description": "Lists all function names"},
+        {"name": "getAlias", "parameters": [{"name": "name", "type": "String"}], "returns": "String", "throws": ["BashClientException"], "description": "Gets alias value"},
+        {"name": "setAlias", "parameters": [{"name": "name", "type": "String"}, {"name": "value", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets an alias"},
+        {"name": "unsetAlias", "parameters": [{"name": "name", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Removes an alias"},
+        {"name": "listAliases", "parameters": [], "returns": "List<String>", "throws": ["BashClientException"], "description": "Lists all alias names"},
+        {"name": "getTrap", "parameters": [{"name": "signal", "type": "String"}], "returns": "String", "throws": ["BashClientException"], "description": "Gets trap action"},
+        {"name": "setTrap", "parameters": [{"name": "signal", "type": "String"}, {"name": "action", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sets a trap"},
+        {"name": "unsetTrap", "parameters": [{"name": "signal", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Removes a trap"},
+        {"name": "listTraps", "parameters": [], "returns": "List<String>", "throws": ["BashClientException"], "description": "Lists signals with active traps"},
+        {"name": "inspect", "parameters": [{"name": "namespaces", "type": "String..."}], "returns": "ObjectNode", "throws": ["BashClientException"], "description": "Bulk snapshot of environment"}
+      ]
+    },
+    "ObserveChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 3,
+      "description": "Pre/post command event subscription",
+      "methods": [
+        {"name": "onPreCommand", "parameters": [{"name": "listener", "type": "Consumer<ObjectNode>"}], "returns": "void", "throws": [], "description": "Registers pre-command callback"},
+        {"name": "onPostCommand", "parameters": [{"name": "listener", "type": "Consumer<ObjectNode>"}], "returns": "void", "throws": [], "description": "Registers post-command callback"},
+        {"name": "poll", "parameters": [{"name": "timeout", "type": "Duration"}], "returns": "ObjectNode", "throws": ["BashClientException"], "description": "Polls for next event"},
+        {"name": "removePreCommandListeners", "parameters": [], "returns": "void", "throws": [], "description": "Removes pre-command listeners"},
+        {"name": "removePostCommandListeners", "parameters": [], "returns": "void", "throws": [], "description": "Removes post-command listeners"},
+        {"name": "removeAllListeners", "parameters": [], "returns": "void", "throws": [], "description": "Removes all listeners"}
+      ]
+    },
+    "DebugChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 4,
+      "description": "Breakpoints, stepping, AST inspection",
+      "methods": [
+        {"name": "addBreakpoint", "parameters": [{"name": "type", "type": "String"}, {"name": "pattern", "type": "String"}], "returns": "int", "throws": ["BashClientException"], "description": "Adds a breakpoint, returns ID"},
+        {"name": "removeBreakpoint", "parameters": [{"name": "breakpointId", "type": "int"}], "returns": "void", "throws": ["BashClientException"], "description": "Removes a breakpoint"},
+        {"name": "listBreakpoints", "parameters": [], "returns": "List<ObjectNode>", "throws": ["BashClientException"], "description": "Lists all breakpoints"},
+        {"name": "enableBreakpoint", "parameters": [{"name": "breakpointId", "type": "int"}], "returns": "void", "throws": ["BashClientException"], "description": "Enables a breakpoint"},
+        {"name": "disableBreakpoint", "parameters": [{"name": "breakpointId", "type": "int"}], "returns": "void", "throws": ["BashClientException"], "description": "Disables a breakpoint"},
+        {"name": "step", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Step into next command"},
+        {"name": "next", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Step over current command"},
+        {"name": "finish", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Run until function returns"},
+        {"name": "continueExecution", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Continue to next breakpoint"},
+        {"name": "skip", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Skip current command"},
+        {"name": "inspectAst", "parameters": [], "returns": "ObjectNode", "throws": ["BashClientException"], "description": "Returns current command AST"},
+        {"name": "onBreakHit", "parameters": [{"name": "listener", "type": "Consumer<BreakHitEvent>"}], "returns": "void", "throws": [], "description": "Registers breakpoint hit callback"},
+        {"name": "removeBreakHitListeners", "parameters": [], "returns": "void", "throws": [], "description": "Removes break hit listeners"}
+      ]
+    },
+    "PtyChannel": {
+      "package": "org.gnu.bash.client.channels",
+      "channelId": 5,
+      "description": "Pseudo-terminal session management",
+      "methods": [
+        {"name": "spawn", "parameters": [], "returns": "PtyInfo", "throws": ["BashClientException"], "description": "Spawns PTY with default 80x24"},
+        {"name": "spawn", "parameters": [{"name": "cols", "type": "int"}, {"name": "rows", "type": "int"}], "returns": "PtyInfo", "throws": ["BashClientException"], "description": "Spawns PTY with dimensions"},
+        {"name": "spawn", "parameters": [{"name": "cols", "type": "int"}, {"name": "rows", "type": "int"}, {"name": "stripAnsi", "type": "boolean"}], "returns": "PtyInfo", "throws": ["BashClientException"], "description": "Spawns PTY with ANSI stripping"},
+        {"name": "writeInput", "parameters": [{"name": "data", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sends input to PTY"},
+        {"name": "readOutput", "parameters": [{"name": "timeout", "type": "Duration"}], "returns": "String", "throws": ["BashClientException"], "description": "Reads PTY output with timeout"},
+        {"name": "onOutput", "parameters": [{"name": "listener", "type": "Consumer<String>"}], "returns": "void", "throws": [], "description": "Registers output callback"},
+        {"name": "resize", "parameters": [{"name": "cols", "type": "int"}, {"name": "rows", "type": "int"}], "returns": "void", "throws": ["BashClientException"], "description": "Resizes PTY dimensions"},
+        {"name": "signal", "parameters": [{"name": "signalName", "type": "String"}], "returns": "void", "throws": ["BashClientException"], "description": "Sends signal to PTY process"},
+        {"name": "configure", "parameters": [{"name": "key", "type": "String"}, {"name": "value", "type": "Object"}], "returns": "void", "throws": ["BashClientException"], "description": "Configures PTY option"},
+        {"name": "close", "parameters": [], "returns": "void", "throws": ["BashClientException"], "description": "Closes PTY session"},
+        {"name": "removeOutputListeners", "parameters": [], "returns": "void", "throws": [], "description": "Removes output listeners"}
+      ]
+    }
+  },
+  "types": {
+    "EvalResult": {
+      "package": "org.gnu.bash.client.types",
+      "kind": "class",
+      "immutable": true,
+      "description": "Command evaluation result",
+      "fields": [
+        {"name": "stdout", "type": "String", "description": "Standard output"},
+        {"name": "stderr", "type": "String", "description": "Standard error"},
+        {"name": "exitCode", "type": "int", "description": "Exit status code"}
+      ],
+      "methods": [
+        {"name": "getStdout", "returns": "String"},
+        {"name": "getStderr", "returns": "String"},
+        {"name": "getExitCode", "returns": "int"},
+        {"name": "isSuccess", "returns": "boolean", "description": "True if exitCode == 0"}
+      ]
+    },
+    "VarInfo": {
+      "package": "org.gnu.bash.client.types",
+      "kind": "class",
+      "immutable": true,
+      "description": "Variable metadata",
+      "fields": [
+        {"name": "value", "type": "String", "description": "Variable value"},
+        {"name": "type", "type": "String", "description": "Type: string, array, assoc, integer, nameref"},
+        {"name": "exported", "type": "boolean", "description": "Whether exported"},
+        {"name": "readonly", "type": "boolean", "description": "Whether readonly"}
+      ],
+      "methods": [
+        {"name": "getValue", "returns": "String"},
+        {"name": "getType", "returns": "String"},
+        {"name": "isExported", "returns": "boolean"},
+        {"name": "isReadonly", "returns": "boolean"}
+      ]
+    },
+    "BreakHitEvent": {
+      "package": "org.gnu.bash.client.types",
+      "kind": "class",
+      "immutable": true,
+      "description": "Breakpoint hit event",
+      "fields": [
+        {"name": "breakpointId", "type": "int", "description": "Breakpoint ID"},
+        {"name": "command", "type": "String", "description": "Command at breakpoint"},
+        {"name": "file", "type": "String", "description": "Source file (nullable)"},
+        {"name": "line", "type": "int", "description": "Line number"}
+      ],
+      "methods": [
+        {"name": "getBreakpointId", "returns": "int"},
+        {"name": "getCommand", "returns": "String"},
+        {"name": "getFile", "returns": "String"},
+        {"name": "getLine", "returns": "int"}
+      ]
+    },
+    "PtyInfo": {
+      "package": "org.gnu.bash.client.types",
+      "kind": "class",
+      "immutable": true,
+      "description": "PTY session information",
+      "fields": [
+        {"name": "pid", "type": "int", "description": "PTY process ID"},
+        {"name": "cols", "type": "int", "description": "Terminal columns"},
+        {"name": "rows", "type": "int", "description": "Terminal rows"}
+      ],
+      "methods": [
+        {"name": "getPid", "returns": "int"},
+        {"name": "getCols", "returns": "int"},
+        {"name": "getRows", "returns": "int"}
+      ]
+    }
+  },
+  "exceptions": {
+    "BashClientException": {
+      "package": "org.gnu.bash.client",
+      "extends": "java.lang.Exception",
+      "kind": "checked",
+      "description": "Base exception for all bashclient errors",
+      "innerClasses": {
+        "AuthException": {
+          "extends": "BashClientException",
+          "description": "Authentication failures"
+        },
+        "ProtocolException": {
+          "extends": "BashClientException",
+          "description": "Wire protocol errors",
+          "extraFields": [
+            {"name": "rawData", "type": "String", "getter": "getRawData"}
+          ]
+        },
+        "TimeoutException": {
+          "extends": "BashClientException",
+          "description": "Response timeout",
+          "extraFields": [
+            {"name": "timeout", "type": "Duration", "getter": "getTimeout"},
+            {"name": "channel", "type": "String", "getter": "getChannel"},
+            {"name": "action", "type": "String", "getter": "getAction"}
+          ]
+        },
+        "TransportException": {
+          "extends": "BashClientException",
+          "description": "Connection/IO errors"
+        },
+        "ServerException": {
+          "extends": "BashClientException",
+          "description": "Server-side errors",
+          "extraFields": [
+            {"name": "errorCode", "type": "String", "getter": "getErrorCode"}
+          ]
+        }
+      }
+    }
+  },
+  "constants": {
+    "channelIds": {
+      "CHAN_CONTROL": 0,
+      "CHAN_COMMAND": 1,
+      "CHAN_STATE": 2,
+      "CHAN_OBSERVE": 3,
+      "CHAN_DEBUG": 4,
+      "CHAN_PTY": 5
+    },
+    "defaults": {
+      "DEFAULT_TIMEOUT_SECONDS": 30,
+      "DEFAULT_PTY_COLS": 80,
+      "DEFAULT_PTY_ROWS": 24
+    }
+  },
+  "transports": [
+    {
+      "class": "UnixSocketTransport",
+      "package": "org.gnu.bash.client.transport",
+      "factoryMethod": "BashClient.connect(socketPath)",
+      "description": "Unix domain socket via junixsocket",
+      "platforms": ["linux", "macos", "cygwin"]
+    },
+    {
+      "class": "StdioTransport",
+      "package": "org.gnu.bash.client.transport",
+      "factoryMethod": "BashClient.connectStdio(args...)",
+      "description": "Subprocess stdin/stdout",
+      "platforms": ["linux", "macos", "cygwin", "windows"]
+    },
+    {
+      "class": "NamedPipeTransport",
+      "package": "org.gnu.bash.client.transport",
+      "factoryMethod": "BashClient.connectNamedPipe(pipeName)",
+      "description": "Windows Named Pipe",
+      "platforms": ["windows", "cygwin"]
+    }
+  ],
+  "examples": [
+    {
+      "file": "examples/Eval.java",
+      "description": "Basic command evaluation",
+      "demonstrates": ["connect", "auth", "eval", "try-with-resources"]
+    },
+    {
+      "file": "examples/Observe.java",
+      "description": "Observer pattern for command events",
+      "demonstrates": ["observe.onPreCommand", "observe.onPostCommand", "configure"]
+    },
+    {
+      "file": "examples/Debugger.java",
+      "description": "Interactive debugger with breakpoints",
+      "demonstrates": ["debug.addBreakpoint", "debug.step", "debug.inspectAst", "debug.onBreakHit"]
+    },
+    {
+      "file": "examples/PtySession.java",
+      "description": "Interactive PTY session",
+      "demonstrates": ["pty.spawn", "pty.writeInput", "pty.onOutput", "pty.resize"]
+    }
+  ]
+}

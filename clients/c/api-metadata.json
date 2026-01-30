@@ -1,0 +1,875 @@
+{
+  "package": {
+    "name": "libbashclient",
+    "version": "0.1.0",
+    "api_version": 1,
+    "language": "c",
+    "standard": "c99",
+    "license": "GPL-3.0-or-later",
+    "header": "bashclient.h",
+    "link_flag": "-lbashclient",
+    "shared_library": "libbashclient.so",
+    "static_library": "libbashclient.a",
+    "pkg_config": "libbashclient",
+    "thread_safe": false,
+    "dependencies": []
+  },
+  "error_codes": [
+    { "name": "BC_OK",            "value":  0, "description": "Success" },
+    { "name": "BC_ERR_AUTH",      "value": -1, "description": "Authentication failed" },
+    { "name": "BC_ERR_PROTOCOL",  "value": -2, "description": "Protocol error" },
+    { "name": "BC_ERR_TIMEOUT",   "value": -3, "description": "Operation timed out" },
+    { "name": "BC_ERR_TRANSPORT", "value": -4, "description": "Transport error" },
+    { "name": "BC_ERR_SERVER",    "value": -5, "description": "Server error" },
+    { "name": "BC_ERR_NOMEM",     "value": -6, "description": "Out of memory" },
+    { "name": "BC_ERR_PARAM",     "value": -7, "description": "Invalid parameter" }
+  ],
+  "constants": [
+    { "name": "BC_API_VERSION",      "value": 1,       "type": "int" },
+    { "name": "BC_VERSION_STRING",   "value": "0.1.0", "type": "string" },
+    { "name": "BC_TRANSPORT_SOCKET", "value": 0,       "type": "int" },
+    { "name": "BC_TRANSPORT_STDIO",  "value": 1,       "type": "int" },
+    { "name": "BC_TRANSPORT_FD",     "value": 2,       "type": "int" },
+    { "name": "BC_TRANSPORT_PIPE",   "value": 3,       "type": "int" },
+    { "name": "BC_WIRE_BINARY",      "value": 0,       "type": "int" },
+    { "name": "BC_WIRE_NDJSON",      "value": 1,       "type": "int" }
+  ],
+  "structs": [
+    {
+      "name": "bc_client_t",
+      "opaque": true,
+      "description": "Client connection handle"
+    },
+    {
+      "name": "bc_opts_t",
+      "opaque": false,
+      "description": "Connection options",
+      "init_macro": "BC_OPTS_INIT",
+      "fields": [
+        { "name": "transport",          "type": "int",          "description": "BC_TRANSPORT_* constant" },
+        { "name": "socket_path",        "type": "const char *", "description": "Unix socket path" },
+        { "name": "auth_token",         "type": "const char *", "description": "Authentication token" },
+        { "name": "stdio_command",      "type": "const char *", "description": "Command for stdio transport" },
+        { "name": "fd_read",            "type": "int",          "description": "Read fd for fd transport" },
+        { "name": "fd_write",           "type": "int",          "description": "Write fd for fd transport" },
+        { "name": "pipe_name",          "type": "const char *", "description": "Named pipe path" },
+        { "name": "connect_timeout_ms", "type": "int",          "description": "Connection timeout (ms)" },
+        { "name": "read_timeout_ms",    "type": "int",          "description": "Read timeout (ms)" },
+        { "name": "write_timeout_ms",   "type": "int",          "description": "Write timeout (ms)" },
+        { "name": "protocol_version",   "type": "int",          "description": "Requested protocol version" },
+        { "name": "wire_format",        "type": "int",          "description": "BC_WIRE_* constant" }
+      ]
+    },
+    {
+      "name": "bc_eval_result_t",
+      "opaque": false,
+      "description": "Command evaluation result",
+      "free_function": "bc_eval_result_free",
+      "fields": [
+        { "name": "stdout_data", "type": "char *", "description": "Captured stdout (never NULL)" },
+        { "name": "stderr_data", "type": "char *", "description": "Captured stderr (never NULL)" },
+        { "name": "exit_code",   "type": "int",    "description": "Exit code of last command" }
+      ]
+    },
+    {
+      "name": "bc_var_info_t",
+      "opaque": false,
+      "description": "Variable with attributes",
+      "fields": [
+        { "name": "name",           "type": "char *",  "description": "Variable name" },
+        { "name": "value",          "type": "char *",  "description": "Variable value" },
+        { "name": "attributes",     "type": "char **", "description": "Attribute string array" },
+        { "name": "num_attributes", "type": "int",     "description": "Number of attributes" }
+      ]
+    },
+    {
+      "name": "bc_pre_command_event_t",
+      "opaque": false,
+      "description": "Pre-command observer event",
+      "fields": [
+        { "name": "seq",         "type": "int",       "description": "Sequence number" },
+        { "name": "timestamp",   "type": "long long", "description": "Unix timestamp (ms)" },
+        { "name": "command",     "type": "char *",    "description": "Command text" },
+        { "name": "cwd",         "type": "char *",    "description": "Current working directory" },
+        { "name": "line_number", "type": "int",       "description": "Source line number" },
+        { "name": "is_subshell", "type": "int",       "description": "1 if in subshell" },
+        { "name": "is_async",    "type": "int",       "description": "1 if async command" }
+      ]
+    },
+    {
+      "name": "bc_post_command_event_t",
+      "opaque": false,
+      "description": "Post-command observer event",
+      "fields": [
+        { "name": "seq",           "type": "int",       "description": "Sequence number" },
+        { "name": "timestamp",     "type": "long long", "description": "Unix timestamp (ms)" },
+        { "name": "command",       "type": "char *",    "description": "Command text" },
+        { "name": "exit_status",   "type": "int",       "description": "Exit status" },
+        { "name": "signal_number", "type": "int",       "description": "Signal number (0 if none)" },
+        { "name": "duration_ms",   "type": "int",       "description": "Execution duration (ms)" }
+      ]
+    },
+    {
+      "name": "bc_breakpoint_t",
+      "opaque": false,
+      "description": "Breakpoint descriptor",
+      "free_function": "bc_breakpoints_free",
+      "fields": [
+        { "name": "id",        "type": "int",    "description": "Breakpoint ID" },
+        { "name": "kind",      "type": "char *", "description": "command, line, or function" },
+        { "name": "enabled",   "type": "int",    "description": "1 if enabled" },
+        { "name": "hit_count", "type": "int",    "description": "Times hit" },
+        { "name": "pattern",   "type": "char *", "description": "Match pattern" },
+        { "name": "line",      "type": "int",    "description": "Line number (0 if N/A)" },
+        { "name": "condition", "type": "char *", "description": "Condition expr (NULL if none)" }
+      ]
+    },
+    {
+      "name": "bc_break_hit_event_t",
+      "opaque": false,
+      "description": "Breakpoint hit event",
+      "fields": [
+        { "name": "line",    "type": "int",    "description": "Line number" },
+        { "name": "command", "type": "char *", "description": "Command at breakpoint" },
+        { "name": "depth",   "type": "int",    "description": "Call depth" }
+      ]
+    },
+    {
+      "name": "bc_debug_status_t",
+      "opaque": false,
+      "description": "Debugger status",
+      "free_function": "bc_debug_status_free",
+      "fields": [
+        { "name": "active",      "type": "int",    "description": "1 if debugger enabled" },
+        { "name": "mode",        "type": "char *", "description": "running, stopped, disabled" },
+        { "name": "breakpoints", "type": "int",    "description": "Number of breakpoints" },
+        { "name": "depth",       "type": "int",    "description": "Current call depth" }
+      ]
+    },
+    {
+      "name": "bc_pty_info_t",
+      "opaque": false,
+      "description": "PTY session info",
+      "free_function": "bc_pty_info_free",
+      "fields": [
+        { "name": "rows",       "type": "int", "description": "Terminal rows" },
+        { "name": "cols",       "type": "int", "description": "Terminal columns" },
+        { "name": "pid",        "type": "int", "description": "Child PID" },
+        { "name": "strip_ansi", "type": "int", "description": "1 if ANSI stripping on" }
+      ]
+    }
+  ],
+  "functions": {
+    "connection": [
+      {
+        "name": "bc_connect",
+        "prototype": "bc_client_t *bc_connect(const char *socket_path, const char *auth_token)",
+        "description": "Connect to bash-server via Unix socket with auto-discovery",
+        "returns": "bc_client_t *",
+        "returns_null_on_error": true,
+        "parameters": [
+          { "name": "socket_path", "type": "const char *", "nullable": true },
+          { "name": "auth_token",  "type": "const char *", "nullable": true }
+        ],
+        "errors": ["BC_ERR_TRANSPORT", "BC_ERR_AUTH", "BC_ERR_TIMEOUT", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_connect_opts",
+        "prototype": "bc_client_t *bc_connect_opts(const bc_opts_t *opts)",
+        "description": "Connect with full transport and option control",
+        "returns": "bc_client_t *",
+        "returns_null_on_error": true,
+        "parameters": [
+          { "name": "opts", "type": "const bc_opts_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_AUTH", "BC_ERR_TIMEOUT", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_close",
+        "prototype": "void bc_close(bc_client_t *c)",
+        "description": "Close connection and free all resources",
+        "returns": "void",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_ping",
+        "prototype": "int bc_ping(bc_client_t *c)",
+        "description": "Test server responsiveness",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT"]
+      },
+      {
+        "name": "bc_configure",
+        "prototype": "int bc_configure(bc_client_t *c, const char *key, const char *value)",
+        "description": "Set session configuration parameter",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",     "type": "bc_client_t *", "nullable": false },
+          { "name": "key",   "type": "const char *",  "nullable": false },
+          { "name": "value", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_SERVER", "BC_ERR_TRANSPORT"]
+      },
+      {
+        "name": "bc_disconnect",
+        "prototype": "int bc_disconnect(bc_client_t *c)",
+        "description": "Graceful server disconnect",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT"]
+      },
+      {
+        "name": "bc_get_fd",
+        "prototype": "int bc_get_fd(bc_client_t *c)",
+        "description": "Get underlying file descriptor for event loop integration",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_last_error",
+        "prototype": "int bc_last_error(bc_client_t *c)",
+        "description": "Get error code from last operation",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_last_error_msg",
+        "prototype": "const char *bc_last_error_msg(bc_client_t *c)",
+        "description": "Get human-readable error message from last operation",
+        "returns": "const char *",
+        "returns_null_on_error": false,
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": true }
+        ],
+        "errors": []
+      }
+    ],
+    "command": [
+      {
+        "name": "bc_eval",
+        "prototype": "bc_eval_result_t *bc_eval(bc_client_t *c, const char *command)",
+        "description": "Evaluate a shell command and return captured output",
+        "returns": "bc_eval_result_t *",
+        "returns_null_on_error": true,
+        "parameters": [
+          { "name": "c",       "type": "bc_client_t *", "nullable": false },
+          { "name": "command", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT", "BC_ERR_SERVER", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_eval_stream",
+        "prototype": "int bc_eval_stream(bc_client_t *c, const char *command, void (*on_stdout)(const char *, size_t, void *), void (*on_stderr)(const char *, size_t, void *), void (*on_complete)(int, void *), void *userdata)",
+        "description": "Start streaming evaluation with incremental callbacks",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",           "type": "bc_client_t *", "nullable": false },
+          { "name": "command",     "type": "const char *",  "nullable": false },
+          { "name": "on_stdout",   "type": "callback",      "nullable": true },
+          { "name": "on_stderr",   "type": "callback",      "nullable": true },
+          { "name": "on_complete", "type": "callback",      "nullable": true },
+          { "name": "userdata",    "type": "void *",        "nullable": true }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT"]
+      }
+    ],
+    "state": [
+      {
+        "name": "bc_var_get",
+        "prototype": "char *bc_var_get(bc_client_t *c, const char *name)",
+        "description": "Get value of a shell variable",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT"]
+      },
+      {
+        "name": "bc_var_set",
+        "prototype": "int bc_var_set(bc_client_t *c, const char *name, const char *value)",
+        "description": "Set a shell variable",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",     "type": "bc_client_t *", "nullable": false },
+          { "name": "name",  "type": "const char *",  "nullable": false },
+          { "name": "value", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_var_set_attr",
+        "prototype": "int bc_var_set_attr(bc_client_t *c, const char *name, const char *value, const char *attributes)",
+        "description": "Set a shell variable with attributes",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",          "type": "bc_client_t *", "nullable": false },
+          { "name": "name",       "type": "const char *",  "nullable": false },
+          { "name": "value",      "type": "const char *",  "nullable": false },
+          { "name": "attributes", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_var_unset",
+        "prototype": "int bc_var_unset(bc_client_t *c, const char *name)",
+        "description": "Unset a shell variable",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_func_get",
+        "prototype": "char *bc_func_get(bc_client_t *c, const char *name)",
+        "description": "Get body of a shell function",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT"]
+      },
+      {
+        "name": "bc_func_set",
+        "prototype": "int bc_func_set(bc_client_t *c, const char *name, const char *body)",
+        "description": "Define or replace a shell function",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false },
+          { "name": "body", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_func_unset",
+        "prototype": "int bc_func_unset(bc_client_t *c, const char *name)",
+        "description": "Remove a shell function",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_alias_get",
+        "prototype": "char *bc_alias_get(bc_client_t *c, const char *name)",
+        "description": "Get expansion text of a shell alias",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT"]
+      },
+      {
+        "name": "bc_alias_set",
+        "prototype": "int bc_alias_set(bc_client_t *c, const char *name, const char *expansion)",
+        "description": "Define or replace a shell alias",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",         "type": "bc_client_t *", "nullable": false },
+          { "name": "name",      "type": "const char *",  "nullable": false },
+          { "name": "expansion", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_alias_unset",
+        "prototype": "int bc_alias_unset(bc_client_t *c, const char *name)",
+        "description": "Remove a shell alias",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_trap_get",
+        "prototype": "char *bc_trap_get(bc_client_t *c, const char *signal_name)",
+        "description": "Get trap action for a signal",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c",           "type": "bc_client_t *", "nullable": false },
+          { "name": "signal_name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT"]
+      },
+      {
+        "name": "bc_trap_set",
+        "prototype": "int bc_trap_set(bc_client_t *c, const char *signal_name, const char *action)",
+        "description": "Set a trap action for a signal",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",           "type": "bc_client_t *", "nullable": false },
+          { "name": "signal_name", "type": "const char *",  "nullable": false },
+          { "name": "action",      "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_trap_unset",
+        "prototype": "int bc_trap_unset(bc_client_t *c, const char *signal_name)",
+        "description": "Remove a trap for a signal",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",           "type": "bc_client_t *", "nullable": false },
+          { "name": "signal_name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_inspect",
+        "prototype": "char *bc_inspect(bc_client_t *c, const char *namespace)",
+        "description": "Get JSON dump of all entries in a namespace",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c",         "type": "bc_client_t *", "nullable": false },
+          { "name": "namespace", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_TIMEOUT", "BC_ERR_NOMEM"]
+      }
+    ],
+    "observe": [
+      {
+        "name": "bc_observe_set_level",
+        "prototype": "int bc_observe_set_level(bc_client_t *c, int level)",
+        "description": "Set observation level (0=off, 1=pre, 2=pre+post)",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",     "type": "bc_client_t *", "nullable": false },
+          { "name": "level", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_on_pre_command",
+        "prototype": "void bc_on_pre_command(bc_client_t *c, void (*fn)(const bc_pre_command_event_t *, void *), void *userdata)",
+        "description": "Register callback for pre-command events",
+        "returns": "void",
+        "parameters": [
+          { "name": "c",        "type": "bc_client_t *", "nullable": false },
+          { "name": "fn",       "type": "callback",      "nullable": true },
+          { "name": "userdata", "type": "void *",        "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_on_post_command",
+        "prototype": "void bc_on_post_command(bc_client_t *c, void (*fn)(const bc_post_command_event_t *, void *), void *userdata)",
+        "description": "Register callback for post-command events",
+        "returns": "void",
+        "parameters": [
+          { "name": "c",        "type": "bc_client_t *", "nullable": false },
+          { "name": "fn",       "type": "callback",      "nullable": true },
+          { "name": "userdata", "type": "void *",        "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_poll",
+        "prototype": "int bc_poll(bc_client_t *c, int timeout_ms)",
+        "description": "Poll for and dispatch server-push events",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",          "type": "bc_client_t *", "nullable": false },
+          { "name": "timeout_ms", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_PROTOCOL"]
+      },
+      {
+        "name": "bc_observe_cleanup",
+        "prototype": "void bc_observe_cleanup(bc_client_t *c)",
+        "description": "Unregister all observe callbacks and set level to 0",
+        "returns": "void",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": []
+      }
+    ],
+    "debug": [
+      {
+        "name": "bc_debug_enable",
+        "prototype": "int bc_debug_enable(bc_client_t *c)",
+        "description": "Enable the debugger",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_disable",
+        "prototype": "int bc_debug_disable(bc_client_t *c)",
+        "description": "Disable the debugger and remove all breakpoints",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_status",
+        "prototype": "bc_debug_status_t *bc_debug_status(bc_client_t *c)",
+        "description": "Get current debugger status",
+        "returns": "bc_debug_status_t *",
+        "returns_null_on_error": true,
+        "free_with": "bc_debug_status_free",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_debug_break_command",
+        "prototype": "int bc_debug_break_command(bc_client_t *c, const char *pattern)",
+        "description": "Set breakpoint on commands matching glob pattern",
+        "returns": "int",
+        "returns_negative_on_error": true,
+        "parameters": [
+          { "name": "c",       "type": "bc_client_t *", "nullable": false },
+          { "name": "pattern", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_break_line",
+        "prototype": "int bc_debug_break_line(bc_client_t *c, int line)",
+        "description": "Set breakpoint on specific line number",
+        "returns": "int",
+        "returns_negative_on_error": true,
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "line", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_break_function",
+        "prototype": "int bc_debug_break_function(bc_client_t *c, const char *name)",
+        "description": "Set breakpoint on function entry",
+        "returns": "int",
+        "returns_negative_on_error": true,
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "name", "type": "const char *",  "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_set_condition",
+        "prototype": "int bc_debug_set_condition(bc_client_t *c, int bp_id, const char *condition)",
+        "description": "Set or clear condition on a breakpoint",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",         "type": "bc_client_t *", "nullable": false },
+          { "name": "bp_id",     "type": "int",           "nullable": false },
+          { "name": "condition", "type": "const char *",  "nullable": true }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_enable_breakpoint",
+        "prototype": "int bc_debug_enable_breakpoint(bc_client_t *c, int bp_id, int enabled)",
+        "description": "Enable or disable a breakpoint",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",       "type": "bc_client_t *", "nullable": false },
+          { "name": "bp_id",   "type": "int",           "nullable": false },
+          { "name": "enabled", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_remove_breakpoint",
+        "prototype": "int bc_debug_remove_breakpoint(bc_client_t *c, int bp_id)",
+        "description": "Remove a breakpoint",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",     "type": "bc_client_t *", "nullable": false },
+          { "name": "bp_id", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_list_breakpoints",
+        "prototype": "int bc_debug_list_breakpoints(bc_client_t *c, bc_breakpoint_t **out, int *count)",
+        "description": "List all breakpoints",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",     "type": "bc_client_t *",      "nullable": false },
+          { "name": "out",   "type": "bc_breakpoint_t **",  "nullable": false },
+          { "name": "count", "type": "int *",               "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_debug_step",
+        "prototype": "int bc_debug_step(bc_client_t *c)",
+        "description": "Step over to next command",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_step_into",
+        "prototype": "int bc_debug_step_into(bc_client_t *c)",
+        "description": "Step into function calls",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_step_out",
+        "prototype": "int bc_debug_step_out(bc_client_t *c)",
+        "description": "Continue until current function returns",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_continue",
+        "prototype": "int bc_debug_continue(bc_client_t *c)",
+        "description": "Continue execution until next breakpoint",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_skip",
+        "prototype": "int bc_debug_skip(bc_client_t *c)",
+        "description": "Skip current command without executing",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_debug_inspect_ast",
+        "prototype": "char *bc_debug_inspect_ast(bc_client_t *c)",
+        "description": "Get JSON representation of current command AST",
+        "returns": "char *",
+        "returns_null_on_error": true,
+        "free_with": "bc_free",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_on_break_hit",
+        "prototype": "void bc_on_break_hit(bc_client_t *c, void (*fn)(const bc_break_hit_event_t *, void *), void *userdata)",
+        "description": "Register callback for breakpoint hit events",
+        "returns": "void",
+        "parameters": [
+          { "name": "c",        "type": "bc_client_t *", "nullable": false },
+          { "name": "fn",       "type": "callback",      "nullable": true },
+          { "name": "userdata", "type": "void *",        "nullable": true }
+        ],
+        "errors": []
+      }
+    ],
+    "pty": [
+      {
+        "name": "bc_pty_spawn",
+        "prototype": "bc_pty_info_t *bc_pty_spawn(bc_client_t *c, int cols, int rows, const char *command)",
+        "description": "Spawn a pseudo-terminal session",
+        "returns": "bc_pty_info_t *",
+        "returns_null_on_error": true,
+        "free_with": "bc_pty_info_free",
+        "parameters": [
+          { "name": "c",       "type": "bc_client_t *", "nullable": false },
+          { "name": "cols",    "type": "int",           "nullable": false },
+          { "name": "rows",    "type": "int",           "nullable": false },
+          { "name": "command", "type": "const char *",  "nullable": true }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER", "BC_ERR_NOMEM"]
+      },
+      {
+        "name": "bc_pty_read",
+        "prototype": "int bc_pty_read(bc_client_t *c, char *buf, size_t buflen, int timeout_ms)",
+        "description": "Read output from PTY",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",          "type": "bc_client_t *", "nullable": false },
+          { "name": "buf",        "type": "char *",        "nullable": false },
+          { "name": "buflen",     "type": "size_t",        "nullable": false },
+          { "name": "timeout_ms", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT"]
+      },
+      {
+        "name": "bc_pty_write",
+        "prototype": "int bc_pty_write(bc_client_t *c, const char *data, size_t len)",
+        "description": "Write input to PTY",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "data", "type": "const char *",  "nullable": false },
+          { "name": "len",  "type": "size_t",        "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT"]
+      },
+      {
+        "name": "bc_pty_resize",
+        "prototype": "int bc_pty_resize(bc_client_t *c, int cols, int rows)",
+        "description": "Resize PTY terminal dimensions",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",    "type": "bc_client_t *", "nullable": false },
+          { "name": "cols", "type": "int",           "nullable": false },
+          { "name": "rows", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_pty_set_strip_ansi",
+        "prototype": "int bc_pty_set_strip_ansi(bc_client_t *c, int enable)",
+        "description": "Enable or disable ANSI escape sequence stripping",
+        "returns": "int",
+        "parameters": [
+          { "name": "c",      "type": "bc_client_t *", "nullable": false },
+          { "name": "enable", "type": "int",           "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT", "BC_ERR_SERVER"]
+      },
+      {
+        "name": "bc_pty_close",
+        "prototype": "int bc_pty_close(bc_client_t *c)",
+        "description": "Close PTY session",
+        "returns": "int",
+        "parameters": [
+          { "name": "c", "type": "bc_client_t *", "nullable": false }
+        ],
+        "errors": ["BC_ERR_PARAM", "BC_ERR_TRANSPORT"]
+      },
+      {
+        "name": "bc_pty_info_free",
+        "prototype": "void bc_pty_info_free(bc_pty_info_t *info)",
+        "description": "Free PTY info struct",
+        "returns": "void",
+        "parameters": [
+          { "name": "info", "type": "bc_pty_info_t *", "nullable": true }
+        ],
+        "errors": []
+      }
+    ],
+    "utility": [
+      {
+        "name": "bc_free",
+        "prototype": "void bc_free(void *ptr)",
+        "description": "Free library-allocated memory",
+        "returns": "void",
+        "parameters": [
+          { "name": "ptr", "type": "void *", "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_version",
+        "prototype": "const char *bc_version(void)",
+        "description": "Get library version string",
+        "returns": "const char *",
+        "thread_safe": true,
+        "parameters": [],
+        "errors": []
+      },
+      {
+        "name": "bc_eval_result_free",
+        "prototype": "void bc_eval_result_free(bc_eval_result_t *r)",
+        "description": "Free eval result struct and all fields",
+        "returns": "void",
+        "parameters": [
+          { "name": "r", "type": "bc_eval_result_t *", "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_debug_status_free",
+        "prototype": "void bc_debug_status_free(bc_debug_status_t *st)",
+        "description": "Free debug status struct and all fields",
+        "returns": "void",
+        "parameters": [
+          { "name": "st", "type": "bc_debug_status_t *", "nullable": true }
+        ],
+        "errors": []
+      },
+      {
+        "name": "bc_breakpoints_free",
+        "prototype": "void bc_breakpoints_free(bc_breakpoint_t *bps, int count)",
+        "description": "Free breakpoint array and all string fields",
+        "returns": "void",
+        "parameters": [
+          { "name": "bps",   "type": "bc_breakpoint_t *", "nullable": true },
+          { "name": "count", "type": "int",               "nullable": false }
+        ],
+        "errors": []
+      }
+    ]
+  },
+  "examples": [
+    {
+      "name": "eval",
+      "file": "examples/eval.c",
+      "description": "Basic command evaluation",
+      "build": "gcc -o eval examples/eval.c -lbashclient"
+    },
+    {
+      "name": "observe",
+      "file": "examples/observe.c",
+      "description": "Command execution observer",
+      "build": "gcc -o observe examples/observe.c -lbashclient"
+    },
+    {
+      "name": "debugger",
+      "file": "examples/debugger.c",
+      "description": "Interactive shell script debugger",
+      "build": "gcc -o debugger examples/debugger.c -lbashclient"
+    },
+    {
+      "name": "pty",
+      "file": "examples/pty.c",
+      "description": "PTY terminal emulator",
+      "build": "gcc -o pty examples/pty.c -lbashclient"
+    }
+  ]
+}

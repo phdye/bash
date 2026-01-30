@@ -1,0 +1,584 @@
+{
+  "package": {
+    "name": "bashclient",
+    "version": "0.1.0",
+    "language": "typescript",
+    "runtime": "node",
+    "min_runtime_version": "16.0.0",
+    "license": "GPL-3.0-or-later",
+    "description": "TypeScript/Node.js client for bash-server",
+    "module_system": "commonjs",
+    "target": "ES2020",
+    "strict_mode": true,
+    "external_dependencies": [],
+    "entry_point": "dist/index.js",
+    "type_definitions": "dist/index.d.ts"
+  },
+  "constants": {
+    "CHAN_CONTROL": { "value": 0, "type": "number", "description": "Control channel ID" },
+    "CHAN_COMMAND": { "value": 1, "type": "number", "description": "Command channel ID" },
+    "CHAN_STATE": { "value": 2, "type": "number", "description": "State channel ID" },
+    "CHAN_OBSERVE": { "value": 3, "type": "number", "description": "Observe channel ID" },
+    "CHAN_DEBUG": { "value": 4, "type": "number", "description": "Debug channel ID" },
+    "CHAN_PTY": { "value": 5, "type": "number", "description": "PTY channel ID" },
+    "FRAME_MAX_PAYLOAD": { "value": 10485760, "type": "number", "description": "Maximum message payload in bytes (10 MiB)" },
+    "TOKEN_HEXLEN": { "value": 64, "type": "number", "description": "Authentication token length in hex characters (256-bit)" },
+    "OBSERVE_LEVEL_OFF": { "value": 0, "type": "number", "description": "Observation disabled" },
+    "OBSERVE_LEVEL_COMMAND": { "value": 1, "type": "number", "description": "Observe command execution events" }
+  },
+  "interfaces": {
+    "Message": {
+      "description": "Base message type for protocol communication",
+      "fields": {
+        "ch": { "type": "number", "required": true, "description": "Channel number (0-5)" },
+        "type": { "type": "string", "required": true, "description": "Message type identifier" },
+        "[key: string]": { "type": "unknown", "required": false, "description": "Additional message-specific fields" }
+      }
+    },
+    "EvalResult": {
+      "description": "Result of command evaluation",
+      "fields": {
+        "stdout": { "type": "string", "required": true, "description": "Standard output" },
+        "stderr": { "type": "string", "required": true, "description": "Standard error" },
+        "exit_code": { "type": "number", "required": true, "description": "Exit status code" }
+      }
+    },
+    "VarInfo": {
+      "description": "Shell variable information",
+      "fields": {
+        "name": { "type": "string", "required": true, "description": "Variable name" },
+        "value": { "type": "string", "required": true, "description": "Variable value" },
+        "attributes": { "type": "string[]", "required": true, "description": "Variable attributes (exported, readonly, integer, array, associative, nameref, lowercase, uppercase, trace)" }
+      }
+    },
+    "FuncInfo": {
+      "description": "Shell function information",
+      "fields": {
+        "name": { "type": "string", "required": true, "description": "Function name" },
+        "definition": { "type": "string", "required": true, "description": "Full function definition text" }
+      }
+    },
+    "AliasInfo": {
+      "description": "Shell alias information",
+      "fields": {
+        "name": { "type": "string", "required": true, "description": "Alias name" },
+        "value": { "type": "string", "required": true, "description": "Alias expansion value" }
+      }
+    },
+    "TrapInfo": {
+      "description": "Shell trap information",
+      "fields": {
+        "signal": { "type": "string", "required": true, "description": "Signal name (EXIT, INT, TERM, etc.)" },
+        "command": { "type": "string", "required": true, "description": "Command executed on signal" }
+      }
+    },
+    "PreCommandEvent": {
+      "description": "Event emitted before command execution",
+      "fields": {
+        "seq": { "type": "number", "required": true, "description": "Sequence number" },
+        "timestamp": { "type": "number", "required": true, "description": "Unix timestamp (seconds, fractional)" },
+        "command": { "type": "string", "required": true, "description": "Command text" },
+        "cwd": { "type": "string", "required": true, "description": "Current working directory" },
+        "line_number": { "type": "number", "required": true, "description": "Line number in script/input" },
+        "is_subshell": { "type": "boolean", "required": true, "description": "Running in subshell" },
+        "is_async": { "type": "boolean", "required": true, "description": "Running as background job" }
+      }
+    },
+    "PostCommandEvent": {
+      "description": "Event emitted after command completion",
+      "fields": {
+        "seq": { "type": "number", "required": true, "description": "Sequence number (matches pre_command)" },
+        "timestamp": { "type": "number", "required": true, "description": "Unix timestamp (seconds, fractional)" },
+        "command": { "type": "string", "required": true, "description": "Command text" },
+        "exit_status": { "type": "number", "required": true, "description": "Exit code" },
+        "signal_number": { "type": "number", "required": true, "description": "Signal that killed the command (0 = none)" },
+        "duration_ms": { "type": "number", "required": true, "description": "Execution duration in milliseconds" }
+      }
+    },
+    "Breakpoint": {
+      "description": "Debug breakpoint definition",
+      "fields": {
+        "id": { "type": "number", "required": true, "description": "Unique breakpoint identifier" },
+        "kind": { "type": "string", "required": true, "description": "Breakpoint type: command, line, function" },
+        "enabled": { "type": "boolean", "required": true, "description": "Whether breakpoint is active" },
+        "hit_count": { "type": "number", "required": true, "description": "Times breakpoint was hit" },
+        "pattern": { "type": "string", "required": false, "description": "Glob pattern (command/function breakpoints)" },
+        "line": { "type": "number", "required": false, "description": "Line number (line breakpoints)" },
+        "condition": { "type": "string", "required": false, "description": "Bash expression condition" }
+      }
+    },
+    "BreakHitEvent": {
+      "description": "Event emitted when breakpoint is hit",
+      "fields": {
+        "line": { "type": "number", "required": true, "description": "Line number where paused" },
+        "command": { "type": "string", "required": true, "description": "Command at breakpoint" },
+        "depth": { "type": "number", "required": true, "description": "Call stack depth" }
+      }
+    },
+    "DebugStatus": {
+      "description": "Current debug session status",
+      "fields": {
+        "active": { "type": "boolean", "required": true, "description": "Whether debugging is active" },
+        "mode": { "type": "string", "required": true, "description": "Current mode: running, paused, etc." },
+        "breakpoints": { "type": "Breakpoint[]", "required": true, "description": "All registered breakpoints" },
+        "depth": { "type": "number", "required": true, "description": "Current call stack depth" }
+      }
+    },
+    "PtyInfo": {
+      "description": "PTY session information",
+      "fields": {
+        "rows": { "type": "number", "required": true, "description": "Terminal row count" },
+        "cols": { "type": "number", "required": true, "description": "Terminal column count" },
+        "pid": { "type": "number", "required": true, "description": "PTY child process ID" },
+        "strip_ansi": { "type": "boolean", "required": true, "description": "ANSI stripping enabled" }
+      }
+    },
+    "InspectItem": {
+      "description": "Item returned by state inspection",
+      "fields": {
+        "name": { "type": "string", "required": true, "description": "Item name" },
+        "value": { "type": "string", "required": false, "description": "Value (variables, aliases)" },
+        "definition": { "type": "string", "required": false, "description": "Definition text (functions)" },
+        "attributes": { "type": "string[]", "required": false, "description": "Variable attributes" },
+        "signal": { "type": "string", "required": false, "description": "Signal name (traps)" },
+        "command": { "type": "string", "required": false, "description": "Trap command (traps)" }
+      }
+    }
+  },
+  "errors": {
+    "AuthError": {
+      "extends": "Error",
+      "description": "Authentication failure (invalid or missing token)"
+    },
+    "ProtocolError": {
+      "extends": "Error",
+      "description": "Protocol violation or malformed message"
+    },
+    "TimeoutError": {
+      "extends": "Error",
+      "description": "Operation exceeded timeout"
+    },
+    "TransportError": {
+      "extends": "Error",
+      "description": "Transport-level failure (connection lost, refused, etc.)"
+    },
+    "ServerError": {
+      "extends": "Error",
+      "description": "Server returned an error response"
+    }
+  },
+  "classes": {
+    "BashClient": {
+      "description": "Main client class for communicating with bash-server",
+      "static_methods": {
+        "connect": {
+          "description": "Connect via Unix socket transport",
+          "parameters": {
+            "options?": {
+              "type": "ConnectOptions",
+              "fields": {
+                "socketPath": { "type": "string", "required": false },
+                "name": { "type": "string", "required": false },
+                "token": { "type": "string", "required": false },
+                "timeout": { "type": "number", "required": false, "default": 30000 }
+              }
+            }
+          },
+          "returns": "Promise<BashClient>",
+          "throws": ["TransportError", "AuthError", "TimeoutError"]
+        },
+        "connectStdio": {
+          "description": "Connect via stdio transport (spawns bash-server)",
+          "parameters": {
+            "options?": {
+              "type": "StdioOptions",
+              "fields": {
+                "serverPath": { "type": "string", "required": false, "default": "bash-server" },
+                "args": { "type": "string[]", "required": false, "default": [] },
+                "env": { "type": "NodeJS.ProcessEnv", "required": false },
+                "timeout": { "type": "number", "required": false, "default": 30000 }
+              }
+            }
+          },
+          "returns": "Promise<BashClient>",
+          "throws": ["TransportError", "TimeoutError"]
+        },
+        "connectFd": {
+          "description": "Connect via file descriptor transport",
+          "parameters": {
+            "options": {
+              "type": "FdOptions",
+              "fields": {
+                "fd": { "type": "number", "required": false },
+                "readFd": { "type": "number", "required": false },
+                "writeFd": { "type": "number", "required": false },
+                "token": { "type": "string", "required": false },
+                "timeout": { "type": "number", "required": false, "default": 30000 }
+              }
+            }
+          },
+          "returns": "Promise<BashClient>",
+          "throws": ["TransportError", "AuthError"]
+        },
+        "connectNamedPipe": {
+          "description": "Connect via Windows Named Pipe transport (Cygwin only)",
+          "parameters": {
+            "options": {
+              "type": "NamedPipeOptions",
+              "fields": {
+                "pipeName": { "type": "string", "required": false },
+                "pipePath": { "type": "string", "required": false },
+                "token": { "type": "string", "required": false },
+                "timeout": { "type": "number", "required": false, "default": 30000 }
+              }
+            }
+          },
+          "returns": "Promise<BashClient>",
+          "throws": ["TransportError", "AuthError"]
+        }
+      },
+      "properties": {
+        "control": { "type": "ControlChannel", "description": "Control channel (ch=0)" },
+        "command": { "type": "CommandChannel", "description": "Command channel (ch=1)" },
+        "state": { "type": "StateChannel", "description": "State channel (ch=2)" },
+        "observe": { "type": "ObserveChannel", "description": "Observe channel (ch=3)" },
+        "debug": { "type": "DebugChannel", "description": "Debug channel (ch=4)" },
+        "pty": { "type": "PtyChannel", "description": "PTY channel (ch=5)" }
+      },
+      "instance_methods": {
+        "close": {
+          "description": "Close the connection and release resources",
+          "parameters": {},
+          "returns": "Promise<void>"
+        },
+        "send": {
+          "description": "Send a raw message and wait for response (low-level)",
+          "parameters": {
+            "message": { "type": "Message", "required": true },
+            "timeout?": { "type": "number", "required": false }
+          },
+          "returns": "Promise<Message>",
+          "throws": ["TransportError", "TimeoutError", "ProtocolError", "ServerError"]
+        }
+      }
+    },
+    "ControlChannel": {
+      "description": "Connection lifecycle and configuration (ch=0)",
+      "methods": {
+        "ping": { "returns": "Promise<number>", "description": "Ping server, returns latency in ms" },
+        "disconnect": { "returns": "Promise<void>", "description": "Gracefully disconnect" },
+        "configure": {
+          "parameters": { "options": { "type": "Record<string, unknown>" } },
+          "returns": "Promise<void>",
+          "description": "Set session configuration"
+        },
+        "info": { "returns": "Promise<Record<string, unknown>>", "description": "Query server info" }
+      }
+    },
+    "CommandChannel": {
+      "description": "Command execution (ch=1)",
+      "methods": {
+        "eval": {
+          "parameters": {
+            "command": { "type": "string", "required": true },
+            "options?": { "type": "{ timeout?: number }", "required": false }
+          },
+          "returns": "Promise<EvalResult>",
+          "throws": ["TimeoutError", "TransportError", "ServerError"],
+          "description": "Execute a bash command"
+        },
+        "evalParsed": {
+          "parameters": {
+            "commandTree": { "type": "unknown", "required": true },
+            "options?": { "type": "{ timeout?: number }", "required": false }
+          },
+          "returns": "Promise<EvalResult>",
+          "throws": ["TimeoutError", "TransportError", "ServerError"],
+          "description": "Execute a pre-parsed COMMAND tree"
+        }
+      }
+    },
+    "StateChannel": {
+      "description": "Shell state manipulation (ch=2)",
+      "methods": {
+        "getVar": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<VarInfo>",
+          "description": "Get variable value and attributes"
+        },
+        "setVar": {
+          "parameters": {
+            "name": { "type": "string" },
+            "value": { "type": "string" },
+            "options?": { "type": "{ attributes?: string[] }" }
+          },
+          "returns": "Promise<void>",
+          "description": "Set a variable"
+        },
+        "unsetVar": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<void>",
+          "description": "Unset a variable"
+        },
+        "getFunc": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<FuncInfo>",
+          "description": "Get function definition"
+        },
+        "setFunc": {
+          "parameters": {
+            "name": { "type": "string" },
+            "definition": { "type": "string" }
+          },
+          "returns": "Promise<void>",
+          "description": "Define a function"
+        },
+        "unsetFunc": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<void>",
+          "description": "Remove a function"
+        },
+        "getAlias": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<AliasInfo>",
+          "description": "Get alias definition"
+        },
+        "setAlias": {
+          "parameters": {
+            "name": { "type": "string" },
+            "value": { "type": "string" }
+          },
+          "returns": "Promise<void>",
+          "description": "Define an alias"
+        },
+        "unsetAlias": {
+          "parameters": { "name": { "type": "string" } },
+          "returns": "Promise<void>",
+          "description": "Remove an alias"
+        },
+        "getTrap": {
+          "parameters": { "signal": { "type": "string" } },
+          "returns": "Promise<TrapInfo>",
+          "description": "Get trap handler"
+        },
+        "setTrap": {
+          "parameters": {
+            "signal": { "type": "string" },
+            "command": { "type": "string" }
+          },
+          "returns": "Promise<void>",
+          "description": "Set trap handler"
+        },
+        "unsetTrap": {
+          "parameters": { "signal": { "type": "string" } },
+          "returns": "Promise<void>",
+          "description": "Remove trap handler"
+        },
+        "inspect": {
+          "parameters": { "namespace": { "type": "string", "values": ["variables", "functions", "aliases", "traps"] } },
+          "returns": "Promise<InspectItem[]>",
+          "description": "List all items in a namespace"
+        }
+      }
+    },
+    "ObserveChannel": {
+      "description": "Command execution event subscription (ch=3)",
+      "extends": "EventEmitter",
+      "methods": {
+        "setLevel": {
+          "parameters": { "level": { "type": "number", "values": [0, 1] } },
+          "returns": "Promise<void>",
+          "description": "Set observation level"
+        },
+        "on": {
+          "parameters": {
+            "event": { "type": "string", "values": ["pre_command", "post_command"] },
+            "handler": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Register event handler (synchronous callback)"
+        },
+        "off": {
+          "parameters": {
+            "event": { "type": "string" },
+            "handler?": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Remove event handler"
+        }
+      },
+      "events": {
+        "pre_command": { "payload": "PreCommandEvent", "description": "Before command execution" },
+        "post_command": { "payload": "PostCommandEvent", "description": "After command completion" }
+      }
+    },
+    "DebugChannel": {
+      "description": "Debugging and breakpoints (ch=4)",
+      "extends": "EventEmitter",
+      "methods": {
+        "addBreakpoint": {
+          "parameters": {
+            "options": {
+              "type": "BreakpointOptions",
+              "fields": {
+                "kind": { "type": "string", "values": ["command", "line", "function"] },
+                "pattern": { "type": "string", "required": false },
+                "line": { "type": "number", "required": false },
+                "condition": { "type": "string", "required": false }
+              }
+            }
+          },
+          "returns": "Promise<Breakpoint>",
+          "description": "Add a breakpoint"
+        },
+        "removeBreakpoint": {
+          "parameters": { "id": { "type": "number" } },
+          "returns": "Promise<void>",
+          "description": "Remove a breakpoint by ID"
+        },
+        "removeAllBreakpoints": {
+          "returns": "Promise<void>",
+          "description": "Remove all breakpoints"
+        },
+        "enableBreakpoint": {
+          "parameters": {
+            "id": { "type": "number" },
+            "enabled": { "type": "boolean" }
+          },
+          "returns": "Promise<void>",
+          "description": "Enable or disable a breakpoint"
+        },
+        "listBreakpoints": {
+          "returns": "Promise<Breakpoint[]>",
+          "description": "List all breakpoints"
+        },
+        "continue": { "returns": "Promise<void>", "description": "Continue execution" },
+        "step": { "returns": "Promise<void>", "description": "Step into next command" },
+        "next": { "returns": "Promise<void>", "description": "Step over (skip function internals)" },
+        "finish": { "returns": "Promise<void>", "description": "Step out of current function" },
+        "skip": { "returns": "Promise<void>", "description": "Skip current command" },
+        "inspectAst": {
+          "returns": "Promise<unknown>",
+          "description": "Inspect AST of current command"
+        },
+        "status": {
+          "returns": "Promise<DebugStatus>",
+          "description": "Query debug session status"
+        },
+        "on": {
+          "parameters": {
+            "event": { "type": "string", "values": ["break_hit"] },
+            "handler": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Register break hit event handler"
+        },
+        "off": {
+          "parameters": {
+            "event": { "type": "string" },
+            "handler?": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Remove event handler"
+        }
+      },
+      "events": {
+        "break_hit": { "payload": "BreakHitEvent", "description": "Breakpoint was hit" }
+      }
+    },
+    "PtyChannel": {
+      "description": "Pseudo-terminal management (ch=5)",
+      "extends": "EventEmitter",
+      "methods": {
+        "spawn": {
+          "parameters": {
+            "options?": {
+              "type": "PtySpawnOptions",
+              "fields": {
+                "rows": { "type": "number", "default": 24 },
+                "cols": { "type": "number", "default": 80 },
+                "strip_ansi": { "type": "boolean", "default": false }
+              }
+            }
+          },
+          "returns": "Promise<PtyInfo>",
+          "description": "Spawn a PTY session"
+        },
+        "writeInput": {
+          "parameters": { "data": { "type": "string" } },
+          "returns": "Promise<void>",
+          "description": "Write to PTY stdin"
+        },
+        "resize": {
+          "parameters": {
+            "rows": { "type": "number" },
+            "cols": { "type": "number" }
+          },
+          "returns": "Promise<void>",
+          "description": "Resize PTY terminal"
+        },
+        "signal": {
+          "parameters": { "sig": { "type": "string", "values": ["INT", "TERM", "KILL", "TSTP", "CONT"] } },
+          "returns": "Promise<void>",
+          "description": "Send signal to PTY process group"
+        },
+        "close": {
+          "returns": "Promise<void>",
+          "description": "Close PTY session"
+        },
+        "on": {
+          "parameters": {
+            "event": { "type": "string", "values": ["output", "close"] },
+            "handler": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Register PTY event handler"
+        },
+        "off": {
+          "parameters": {
+            "event": { "type": "string" },
+            "handler?": { "type": "Function" }
+          },
+          "returns": "this",
+          "description": "Remove event handler"
+        }
+      },
+      "events": {
+        "output": { "payload": "string", "description": "PTY output data" },
+        "close": { "payload": "void", "description": "PTY session closed" }
+      }
+    }
+  },
+  "source_modules": {
+    "index.ts": "Public API barrel export",
+    "client.ts": "BashClient class, connection lifecycle, message routing",
+    "types.ts": "TypeScript interfaces and constants",
+    "protocol.ts": "NDJSON frame encoding/decoding, FrameReader",
+    "transport.ts": "Transport interface and 4 implementations",
+    "errors.ts": "Error class hierarchy (5 classes)",
+    "channels/control.ts": "ControlChannel (ch=0)",
+    "channels/command.ts": "CommandChannel (ch=1)",
+    "channels/state.ts": "StateChannel (ch=2)",
+    "channels/observe.ts": "ObserveChannel (ch=3)",
+    "channels/debug.ts": "DebugChannel (ch=4)",
+    "channels/pty.ts": "PtyChannel (ch=5)"
+  },
+  "examples": {
+    "eval.ts": {
+      "description": "Basic command evaluation",
+      "demonstrates": ["BashClient.connect", "command.eval", "EvalResult", "error handling", "close"]
+    },
+    "observe.ts": {
+      "description": "Command observation and profiling",
+      "demonstrates": ["observe.setLevel", "observe.on", "PreCommandEvent", "PostCommandEvent"]
+    },
+    "debugger.ts": {
+      "description": "Breakpoints and stepping",
+      "demonstrates": ["debug.addBreakpoint", "debug.on break_hit", "debug.step", "debug.continue", "debug.inspectAst"]
+    },
+    "pty.ts": {
+      "description": "PTY terminal interaction",
+      "demonstrates": ["pty.spawn", "pty.writeInput", "pty.on output", "pty.resize", "pty.close"]
+    }
+  }
+}
