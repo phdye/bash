@@ -1,0 +1,34 @@
+# bash-server.tests -- Tests for the bash-server daemon
+#
+# Tests are organized into sub-tests:
+#   bash-server1.sub - Protocol unit tests (C program)
+#   bash-server2.sub - Socket unit tests (C program)
+#   bash-server3.sub - Config/auth unit tests (C program)
+#   bash-server4.sub - Integration: server lifecycle, auth, PING, QUIT
+#   bash-server5.sub - Integration: EVAL command execution
+#
+# Requires: bash-server and bashclient binaries built
+
+# Build directory (set by run-all or caller)
+: ${BUILD_DIR:=..}
+
+SERVER_BIN=${BUILD_DIR}/bash-server/bash-server
+CLIENT_BIN=${BUILD_DIR}/bashclient/bashclient
+TEST_DIR=${BUILD_DIR}/bash-server/tests
+
+# Check prerequisites
+if [ ! -x "${SERVER_BIN}" ] && [ ! -x "${SERVER_BIN}.exe" ]; then
+    echo "bash-server: SKIPPED (bash-server binary not found)"
+    exit 0
+fi
+
+# Run C unit tests (build if needed)
+echo "bash-server: unit tests"
+${THIS_SH} ./bash-server1.sub
+${THIS_SH} ./bash-server2.sub
+${THIS_SH} ./bash-server3.sub
+
+# Run integration tests
+echo "bash-server: integration tests"
+${THIS_SH} ./bash-server4.sub
+${THIS_SH} ./bash-server5.sub

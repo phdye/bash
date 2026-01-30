@@ -1,0 +1,174 @@
+# bash-server4.sub -- Integration: server lifecycle, auth, PING, QUIT
+#
+# Starts the actual bash-server, connects with a C test client,
+# tests the protocol, then shuts down cleanly.
+
+: ${BUILD_DIR:=..}
+
+SERVER_BIN=${BUILD_DIR}/bash-server/bash-server
+TEST_CLIENT=${BUILD_DIR}/bash-server/tests/test_client
+
+# Find binaries (handle .exe extension on Cygwin)
+for ext in .exe ""; do
+    [ -x "${SERVER_BIN}${ext}" ] && SERVER_BIN="${SERVER_BIN}${ext}" && break
+done
+for ext in .exe ""; do
+    [ -x "${TEST_CLIENT}${ext}" ] && TEST_CLIENT="${TEST_CLIENT}${ext}" && break
+done
+
+if [ ! -x "$SERVER_BIN" ]; then
+    echo "bash-server4.sub: SKIPPED (server binary not found)"
+    exit 0
+fi
+if [ ! -x "$TEST_CLIENT" ]; then
+    echo "bash-server4.sub: SKIPPED (test_client not found)"
+    exit 0
+fi
+
+# Set up temp directory
+TESTDIR=$(mktemp -d /tmp/bash-server-test4.XXXXXX)
+SOCK="${TESTDIR}/sock"
+TOKFILE="${SOCK}.token"
+PIDFILE="${TESTDIR}/server.pid"
+
+cleanup() {
+    if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null
+        for i in $(seq 1 30); do
+            kill -0 "$SERVER_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -9 "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+    fi
+    rm -rf "$TESTDIR"
+}
+trap cleanup EXIT
+
+failed=0
+pass() { echo "  PASS: $1"; }
+fail() { echo "  FAIL: $1"; failed=$((failed + 1)); }
+
+# --- Start server ---
+"$SERVER_BIN" --socket "$SOCK" --pidfile "$PIDFILE" --verbose &
+SERVER_PID=$!
+
+# Wait for socket to appear (up to 5s)
+for i in $(seq 1 50); do
+    [ -S "$SOCK" ] && [ -f "$TOKFILE" ] && break
+    sleep 0.1
+done
+
+if [ ! -S "$SOCK" ]; then
+    fail "server did not create socket within 5s"
+    exit 1
+fi
+
+# Read token
+TOKEN=$(cat "$TOKFILE" | tr -d '\n\r')
+
+# --- Test: token file exists with 0600 ---
+perms=$(stat -c '%a' "$TOKFILE" 2>/dev/null || stat -f '%Lp' "$TOKFILE" 2>/dev/null)
+if [ "$perms" = "600" ]; then
+    pass "token file permissions = 0600"
+else
+    fail "token file permissions = $perms (expected 600)"
+fi
+
+# --- Test: token is 64 hex chars ---
+toklen=${#TOKEN}
+if [ "$toklen" -eq 64 ] && echo "$TOKEN" | grep -qE '^[0-9a-f]{64}$'; then
+    pass "token is 64 lowercase hex chars"
+else
+    fail "token format wrong: len=$toklen"
+fi
+
+# --- Test: PID file created ---
+if [ -f "$PIDFILE" ]; then
+    pass "PID file created"
+else
+    fail "PID file not found"
+fi
+
+# --- Test: PID file contains server PID ---
+FILE_PID=$(cat "$PIDFILE" | tr -d '\n\r')
+if [ "$FILE_PID" = "$SERVER_PID" ]; then
+    pass "PID file contains correct PID"
+else
+    fail "PID file: got $FILE_PID, expected $SERVER_PID"
+fi
+
+# --- Test: PING/PONG ---
+PONG_RESULT=$(timeout 5 "$TEST_CLIENT" "$SOCK" PING 2>/dev/null)
+if [ "$PONG_RESULT" = "PONG" ]; then
+    pass "PING returns PONG"
+else
+    fail "PING: got '$PONG_RESULT', expected 'PONG'"
+fi
+
+# --- Test: AUTH with invalid token ---
+AUTH_BAD=$(timeout 5 "$TEST_CLIENT" "$SOCK" AUTH wrongtoken 2>/dev/null)
+if echo "$AUTH_BAD" | grep -q "^ERR"; then
+    pass "AUTH with bad token returns ERR"
+else
+    fail "AUTH bad token: got '$AUTH_BAD'"
+fi
+
+# --- Test: AUTH with valid token ---
+AUTH_OK=$(timeout 5 "$TEST_CLIENT" "$SOCK" AUTH "$TOKEN" 2>/dev/null)
+if [ "$AUTH_OK" = "OK" ]; then
+    pass "AUTH with valid token returns OK"
+else
+    fail "AUTH valid token: got '$AUTH_OK'"
+fi
+
+# --- Test: AUTH with empty token ---
+AUTH_EMPTY=$(timeout 5 "$TEST_CLIENT" "$SOCK" AUTH 2>/dev/null)
+if echo "$AUTH_EMPTY" | grep -q "^ERR"; then
+    pass "AUTH with no token returns ERR"
+else
+    fail "AUTH empty: got '$AUTH_EMPTY'"
+fi
+
+# --- Test: AUTH double (already authenticated) ---
+AUTH_DOUBLE=$(timeout 5 "$TEST_CLIENT" "$SOCK" multi "AUTH ${TOKEN}\nAUTH ${TOKEN}" 2>/dev/null | tail -1)
+if echo "$AUTH_DOUBLE" | grep -q "^OK"; then
+    pass "AUTH twice returns OK (already authenticated)"
+else
+    fail "AUTH double: got '$AUTH_DOUBLE'"
+fi
+
+# --- Test: QUIT returns BYE ---
+QUIT_RESULT=$(timeout 5 "$TEST_CLIENT" "$SOCK" QUIT 2>/dev/null)
+if [ "$QUIT_RESULT" = "BYE" ]; then
+    pass "QUIT returns BYE"
+else
+    fail "QUIT: got '$QUIT_RESULT', expected 'BYE'"
+fi
+
+# --- Test: Unknown command returns ERR ---
+UNK_RESULT=$(timeout 5 "$TEST_CLIENT" "$SOCK" FOOBAR 2>/dev/null)
+if echo "$UNK_RESULT" | grep -q "^ERR"; then
+    pass "unknown command returns ERR"
+else
+    fail "unknown cmd: got '$UNK_RESULT'"
+fi
+
+# --- Test: Clean shutdown ---
+kill "$SERVER_PID" 2>/dev/null
+for i in $(seq 1 30); do
+    kill -0 "$SERVER_PID" 2>/dev/null || break
+    sleep 0.1
+done
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    pass "server exits on SIGTERM"
+    SERVER_PID=""  # Already exited
+else
+    fail "server did not exit on SIGTERM"
+fi
+
+# --- Summary ---
+if [ $failed -gt 0 ]; then
+    echo "bash-server4.sub: $failed test(s) FAILED"
+    exit 1
+fi
