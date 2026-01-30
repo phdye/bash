@@ -171,7 +171,7 @@ source_builtin (list)
   if (list->next)
     {
       push_dollar_vars ();
-      add_unwind_protect ((Function *)maybe_pop_dollar_vars, (char *)NULL);
+      add_unwind_protect ((VFunction *)maybe_pop_dollar_vars, (char *)NULL);
       if (debugging_mode || shell_compatibility_level <= 44)
 	init_bash_argv ();	/* Initialize BASH_ARGV and BASH_ARGC */
       remember_args (list->next, 1);

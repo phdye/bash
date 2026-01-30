@@ -128,7 +128,7 @@ static int shell_control_structure PARAMS((enum command_type));
 static void cleanup_redirects PARAMS((REDIRECT *));
 
 #if defined (JOB_CONTROL)
-static int restore_signal_mask PARAMS((sigset_t *));
+static void restore_signal_mask PARAMS((sigset_t *));
 #endif
 
 static int builtin_status PARAMS((int));
@@ -502,12 +502,12 @@ dispose_partial_redirects ()
 #if defined (JOB_CONTROL)
 /* A function to restore the signal mask to its proper value when the shell
    is interrupted or errors occur while creating a pipeline. */
-static int
+static void
 restore_signal_mask (
      sigset_t *set
 )
 {
-  return (sigprocmask (SIG_SETMASK, set, (sigset_t *)NULL));
+  sigprocmask (SIG_SETMASK, set, (sigset_t *)NULL);
 }
 #endif /* JOB_CONTROL */
 

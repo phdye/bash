@@ -136,7 +136,7 @@ command_builtin (list)
   command->flags |= COMMAND_BUILTIN_FLAGS;
   command->value.Simple->flags |= COMMAND_BUILTIN_FLAGS;
 
-  add_unwind_protect ((char *)dispose_command, command);
+  add_unwind_protect ((VFunction *)dispose_command, command);
   result = execute_command (command);
 
   run_unwind_frame ("command_builtin");
