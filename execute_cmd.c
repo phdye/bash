@@ -4377,6 +4377,7 @@ execute_simple_command (
       pre_info.line_number = line_number;
       pre_info.is_subshell = subshell_environment != 0;
       pre_info.is_async = async;
+      pre_info.command = currently_executing_command;
       run_pre_command_hooks (&pre_info);
     }
 

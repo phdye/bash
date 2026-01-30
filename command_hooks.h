@@ -33,6 +33,7 @@ typedef struct {
     int line_number;              /* Line number in script/input */
     int is_subshell;              /* Running in subshell? */
     int is_async;                 /* Running asynchronously? */
+    struct command *command;      /* The COMMAND being executed (may be NULL) */
 } pre_command_info_t;
 
 /* Information passed to post-command hooks */
