@@ -4,8 +4,8 @@
 
 `bash-server` is a Unix domain socket server that provides persistent,
 authenticated remote evaluation of Bash commands.  It embeds a full GNU Bash
-5.1 interpreter and exposes it through a lightweight, line-oriented text
-protocol.
+5.1 interpreter linked as a shared library (`cygbash-5.1.dll`) and exposes
+it through a lightweight, line-oriented text protocol.
 
 A companion CLI client, `bashclient`, connects to a running server, authenticates,
 and submits commands for execution.  Output (stdout and stderr) is captured
@@ -28,10 +28,11 @@ the command's exit code.
 
 ### Components
 
-| Binary | Description |
-|--------|-------------|
-| `bash-server` | Daemon process (links against Bash shared library) |
-| `bashclient` | CLI client (standalone, no Bash linkage) |
+| Binary | Description | Links against |
+|--------|-------------|---------------|
+| `bash-server` | Daemon process | `cygbash-5.1.dll`, `cygwin1.dll` |
+| `bashclient` | CLI client | `cygwin1.dll` only (standalone) |
+| `cygbash-5.1.dll` | Shared Bash library | readline, history, ncurses, intl |
 
 ## Quick Start
 
@@ -123,6 +124,16 @@ The server performs clean shutdown on SIGINT/SIGTERM:
 | [configuration.md](configuration.md) | Operators | Deployment, configuration, and operations |
 | [security.md](security.md) | Security engineers | Threat model and security controls |
 | [api/](api/) | Developers | Per-operation reference (man-page style) |
+
+## Platform Support
+
+`bash-server` is developed and tested on Cygwin (x86_64).  The Cygwin platform
+has a specific quirk with `AF_UNIX` sockets: they are internally implemented
+over TCP loopback with a credential handshake.  The `--no-peercred` flag
+disables this handshake to allow non-C clients (e.g., Python's `socket` module)
+to connect without `ECONNABORTED` errors.
+
+See [security.md](security.md) for the implications of `--no-peercred`.
 
 ## Build
 

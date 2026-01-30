@@ -28,8 +28,8 @@
 │  └────────────────────────────────────────────────────────┘  │
 │                            │                                 │
 │                     ┌──────┴──────┐                          │
-│                     │  libbash    │                          │
-│                     │  (shared)   │                          │
+│                     │ cygbash-5.1 │                          │
+│                     │    .dll     │                          │
 │                     │             │                          │
 │                     │ parse_and_  │                          │
 │                     │ execute()   │                          │
@@ -42,7 +42,7 @@
 │     bashclient      │
 │                     │
 │ Standalone binary   │
-│ No bash lib linkage │
+│ No bash DLL linkage │
 │ Base64 decode       │
 │ Three modes:        │
 │  -e eval            │
@@ -92,6 +92,7 @@ typedef struct server_config {
     int   max_clients;    // Max simultaneous clients (default: 10, currently unused)
     int   verbose;        // Verbose logging to stderr
     int   daemon_mode;    // Fork to background
+    int   no_peercred;    // Cygwin: disable SO_PEERCRED handshake
     char *pid_file;       // Path for PID file (daemon mode)
 } server_config_t;
 ```
@@ -221,6 +222,30 @@ This is done once per server lifetime (guarded by `bash_initialized` flag).
 - SIGCHLD uses `SA_RESTART` so that ongoing I/O operations (pipe reads,
   socket writes) are not interrupted when a child exits.
 
+## Socket Implementation
+
+### Cygwin AF_UNIX Internals
+
+Cygwin implements `AF_UNIX` sockets over TCP loopback (`127.0.0.1`).  The
+Cygwin runtime performs a credential handshake during `connect()`/`accept()`
+using a shared secret and `ucred` structure exchange.
+
+**Problem:**  Python's `socket.connect()` uses a non-blocking connect +
+`poll()` + `getsockopt(SO_ERROR)` pattern.  This races with Cygwin's
+credential handshake, causing `ECONNABORTED` (errno 113) on `accept()`.
+
+**Solution:**  The `--no-peercred` flag calls:
+```c
+setsockopt(fd, SOL_SOCKET, SO_PEERCRED, NULL, 0);
+```
+This invokes Cygwin's `af_local_set_no_getpeereid()`, disabling the
+credential handshake entirely.  The `NULL, 0` form is required — any
+non-NULL optval or non-zero optlen returns `EINVAL`.
+
+**Trade-off:**  `getpeereid()` and `getsockopt(SO_PEERCRED)` no longer
+return peer credentials.  This is acceptable because bash-server uses
+token-based authentication rather than peer credential checks.
+
 ## Build System Integration
 
 ### Makefile Targets (top-level)
@@ -234,7 +259,7 @@ install-bash-server:       # Install both to $(bindir)
 ### Link Dependencies
 
 **bash-server** links against:
-- Bash shared library — Bash interpreter
+- `cygbash-5.1.dll` (via `-L$(BUILD_DIR) -lcygbash`) — Bash interpreter
 - `-lreadline` — Readline library
 - `-lhistory` — History library
 - `-lncursesw` — Terminal capabilities
@@ -243,6 +268,23 @@ install-bash-server:       # Install both to $(bindir)
 
 **bashclient** links against:
 - `-ldl` only — Standalone, no Bash dependency
+
+### DLL Architecture
+
+The bash build produces a shared library `cygbash-5.1.dll` containing
+the full Bash interpreter.  Both `bash.exe` (the shell) and `bash-server.exe`
+link against this DLL via an import library (`libcygbash.dll.a`).
+
+```
+bash.exe ──────────┐
+                    ├──► cygbash-5.1.dll ──► cygwin1.dll
+bash-server.exe ───┘                         ──► KERNEL32.dll
+```
+
+This architecture means:
+- `cygbash-5.1.dll` must be in the same directory or in PATH
+- Both `bash.exe` and `bash-server.exe` share the same Bash version
+- Bug fixes in Bash automatically apply to both binaries
 
 ## Memory Management
 
@@ -318,6 +360,6 @@ stdio redirection, at the cost of isolation.
 
 ### Loadable Builtins
 
-The Bash shared library supports loadable builtins via `enable -f`.
-This could allow extending the server with custom builtins without
-recompilation.
+The Cygwin DLL architecture (`cygbash-5.1.dll`) supports loadable
+builtins via `enable -f`.  This could allow extending the server with
+custom builtins without recompilation.

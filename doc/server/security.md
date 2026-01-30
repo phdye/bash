@@ -124,6 +124,25 @@ The Unix domain socket is the sole communication channel:
 - **Stale socket handling:**  `unlink()` before `bind()` removes stale
   socket files from previous runs.
 
+### Cygwin-Specific: SO_PEERCRED
+
+On Cygwin, `AF_UNIX` sockets use TCP loopback internally.  Cygwin adds
+a credential handshake (secret + `ucred` exchange) during connect/accept.
+
+**Default mode (peercred enabled):**
+- Cygwin verifies the connecting process is on the same machine.
+- `getpeereid()` returns the peer's UID/GID.
+- Not used by bash-server (token auth is preferred).
+
+**`--no-peercred` mode:**
+- Disables the credential handshake via `setsockopt(SO_PEERCRED, NULL, 0)`.
+- Required for Python clients due to non-blocking connect race condition.
+- `getpeereid()` no longer returns valid data.
+- **Security impact:**  Minimal.  The credential handshake only verified
+  same-machine origin (already guaranteed by Unix socket) and provided
+  peer UID (unused by bash-server).  Token authentication remains the
+  primary access control.
+
 ## Execution Isolation
 
 ### Fork-per-Command Model
@@ -235,6 +254,12 @@ STDOUT or STDERR line is approximately 1.37 MB.
 - [ ] `ulimit -n` limits open file descriptors
 - [ ] Process manager configured for restart-on-failure
 - [ ] Client-side timeouts implemented for EVAL commands
+
+### Cygwin-Specific
+
+- [ ] `--no-peercred` used only if Python/non-C clients are needed
+- [ ] Token file is on a local filesystem (not network-mounted)
+- [ ] `/tmp` has appropriate sticky bit
 
 ### Monitoring
 

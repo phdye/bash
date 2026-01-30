@@ -9,7 +9,7 @@ server_socket_create — create, configure, bind, and listen on a Unix domain so
 ```c
 #include "server.h"
 
-int server_socket_create(const char *path);
+int server_socket_create(const char *path, int no_peercred);
 ```
 
 ## DESCRIPTION
@@ -21,11 +21,18 @@ begins listening for connections.
 If a socket file already exists at **path**, it is unlinked before binding.
 This handles stale socket files from previous server runs.
 
+On Cygwin, if **no_peercred** is true, disables the credential handshake
+via `setsockopt(SOL_SOCKET, SO_PEERCRED, NULL, 0)`.
+
 ## PARAMETERS
 
 **path**
 :   Filesystem path for the Unix socket.  Must be shorter than
     `sizeof(struct sockaddr_un.sun_path)` (typically 108 bytes).
+
+**no_peercred**
+:   If non-zero and on Cygwin, disable the `SO_PEERCRED` credential
+    handshake.  Ignored on non-Cygwin platforms.
 
 ## RETURN VALUE
 
@@ -41,10 +48,11 @@ On error, returns **-1** with `errno` set:
 1. Validate path length against `sun_path`.
 2. `socket(AF_UNIX, SOCK_STREAM, 0)`.
 3. `setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)`.
-4. `unlink(path)` — remove stale socket file.
-5. `bind()` to the path.
-6. `chmod(path, 0600)`.
-7. `listen(fd, SOMAXCONN)`.
+4. (Cygwin + no_peercred): `setsockopt(SOL_SOCKET, SO_PEERCRED, NULL, 0)`.
+5. `unlink(path)` — remove stale socket file.
+6. `bind()` to the path.
+7. `chmod(path, 0600)`.
+8. `listen(fd, SOMAXCONN)`.
 
 ## NOTES
 

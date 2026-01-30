@@ -16,6 +16,7 @@ bash-server [OPTIONS]
 | `--daemon` | `-d` | None | Off | Daemonize (background) |
 | `--pidfile PATH` | `-p` | Required | None | Write PID to file |
 | `--max-clients N` | `-m` | Required | 10 | Maximum simultaneous clients (reserved) |
+| `--no-peercred` | `-P` | None | Off | Disable Cygwin credential handshake |
 | `--verbose` | `-v` | None | Off | Verbose logging to stderr |
 | `--help` | `-h` | None | — | Print usage and exit |
 | `--version` | `-V` | None | — | Print version and exit |
@@ -59,18 +60,18 @@ match wins:
 
 ### Default Path Behavior
 
-On a system with systemd user session:
-
-```
-Socket: /run/user/<uid>/bash-server/sock
-Token:  /run/user/<uid>/bash-server/sock.token
-```
-
-On a system without `$XDG_RUNTIME_DIR`:
+On a typical Cygwin system without `$XDG_RUNTIME_DIR`:
 
 ```
 Socket: /tmp/bash-server-<uid>/sock
 Token:  /tmp/bash-server-<uid>/sock.token
+```
+
+On a Linux system with systemd user session:
+
+```
+Socket: /run/user/<uid>/bash-server/sock
+Token:  /run/user/<uid>/bash-server/sock.token
 ```
 
 ### Directory Creation
@@ -297,6 +298,23 @@ RuntimeDirectory=bash-server
 WantedBy=multi-user.target
 ```
 
+### Cygwin Service (cygrunsrv)
+
+```bash
+cygrunsrv --install bash-server \
+  --path /usr/local/bin/bash-server \
+  --args "--verbose" \
+  --user SYSTEM \
+  --desc "Bash Server Daemon"
+
+cygrunsrv --start bash-server
+cygrunsrv --stop bash-server
+```
+
+Note: For Cygwin service use, do **not** pass `--daemon` since cygrunsrv
+manages the process lifecycle.  Use `--verbose` for logging to the
+service's stdout/stderr which cygrunsrv captures.
+
 ## Troubleshooting
 
 ### Cannot Connect
@@ -306,6 +324,7 @@ WantedBy=multi-user.target
 | `connect: No such file or directory` | Socket file missing | Start the server |
 | `connect: Connection refused` | Stale socket file | Remove file, restart server |
 | `connect: Permission denied` | Socket permissions | Check file ownership/mode |
+| `ECONNABORTED` (errno 113) | Cygwin peercred race | Use `--no-peercred` flag |
 
 ### Authentication Failures
 
