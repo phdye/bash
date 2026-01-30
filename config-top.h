@@ -58,7 +58,7 @@
 /* Define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS if you don't want builtins
    like `echo' and `printf' to report errors when output does not succeed
    due to EPIPE. */
-/* #define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS */
+#define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS
 
 /* The default value of the PATH variable. */
 #ifndef DEFAULT_PATH_VALUE
@@ -94,17 +94,17 @@
 /* #define SYS_BASHRC "/etc/bash.bashrc" */
 
 /* System-wide .bash_logout for login shells. */
-/* #define SYS_BASH_LOGOUT "/etc/bash.bash_logout" */
+#define SYS_BASH_LOGOUT "/etc/bash.bash_logout"
 
 /* Define this to make non-interactive shells begun with argv[0][0] == '-'
    run the startup files when not in posix mode. */
-/* #define NON_INTERACTIVE_LOGIN_SHELLS */
+#define NON_INTERACTIVE_LOGIN_SHELLS
 
 /* Define this if you want bash to try to check whether it's being run by
    sshd and source the .bashrc if so (like the rshd behavior).  This checks
    for the presence of SSH_CLIENT or SSH2_CLIENT in the initial environment,
    which can be fooled under certain not-uncommon circumstances. */
-/* #define SSH_SOURCE_BASHRC */
+#define SSH_SOURCE_BASHRC
 
 /* Define if you want the case-toggling operators (~[~]) and the
    `capcase' variable attribute (declare -c). */

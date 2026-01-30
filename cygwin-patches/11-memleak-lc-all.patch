@@ -1,0 +1,19 @@
+From: Fedora/Cygwin
+Subject: Fix memory leak in set_default_locale
+
+The setlocale() return value is valid until the next setlocale call.
+For default_locale which is only set once during initialization,
+we don't need to copy the string with savestring(), which was causing
+a minor memory leak.
+
+--- a/locale.c
++++ b/locale.c
+@@ -78,8 +78,6 @@ set_default_locale ()
+ {
+ #if defined (HAVE_SETLOCALE)
+   default_locale = setlocale (LC_ALL, "");
+-  if (default_locale)
+-    default_locale = savestring (default_locale);
+ #else
+   default_locale = savestring ("C");
+ #endif /* HAVE_SETLOCALE */

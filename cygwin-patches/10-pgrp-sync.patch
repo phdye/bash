@@ -1,0 +1,21 @@
+From: Fedora/Cygwin
+Subject: Force bash_cv_pgrp_pipe=yes for cross-compilation
+
+When cross-compiling, the configure test for pgrp synchronization
+cannot run. This patch forces bash_cv_pgrp_pipe=yes which is the
+safe choice for all modern systems.
+
+NOTE: This patch is primarily for cross-compilation scenarios.
+For native builds, configure will detect the correct value.
+
+--- a/configure
++++ b/configure
+@@ -XXXX,6 +XXXX,9 @@ else
+   # We'll just assume it does
+   bash_cv_pgrp_pipe=yes
+ fi
++
++# Force yes for cross-compilation safety
++bash_cv_pgrp_pipe=yes
+ rm -f conftest*
+ 

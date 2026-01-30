@@ -176,9 +176,7 @@ AC_CACHE_VAL(bash_cv_decl_under_sys_siglist,
 [AC_TRY_COMPILE([
 #include <sys/types.h>
 #include <signal.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif], [ char *msg = _sys_siglist[2]; ],
+#include <unistd.h>], [ char *msg = _sys_siglist[2]; ],
   bash_cv_decl_under_sys_siglist=yes, bash_cv_decl_under_sys_siglist=no,
   [AC_MSG_WARN(cannot check for _sys_siglist[] if cross compiling -- defaulting to no)])])dnl
 AC_MSG_RESULT($bash_cv_decl_under_sys_siglist)
@@ -194,9 +192,7 @@ AC_CACHE_VAL(bash_cv_under_sys_siglist,
 [AC_TRY_RUN([
 #include <sys/types.h>
 #include <signal.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdlib.h>
 #ifndef UNDER_SYS_SIGLIST_DECLARED
 extern char *_sys_siglist[];
@@ -223,9 +219,7 @@ AC_CACHE_VAL(bash_cv_sys_siglist,
 [AC_TRY_RUN([
 #include <sys/types.h>
 #include <signal.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdlib.h>
 #if !HAVE_DECL_SYS_SIGLIST
 extern char *sys_siglist[];
@@ -331,9 +325,7 @@ AC_CACHE_VAL(bash_cv_opendir_not_robust,
 #include <stdio.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h>
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
@@ -600,9 +592,7 @@ AC_DEFUN(BASH_FUNC_GETENV,
 [AC_MSG_CHECKING(to see if getenv can be redefined)
 AC_CACHE_VAL(bash_cv_getenv_redef,
 [AC_TRY_RUN([
-#ifdef HAVE_UNISTD_H
-#  include <unistd.h>
-#endif
+#include <unistd.h>
 #include <stdlib.h>
 #ifndef __STDC__
 #  ifndef const
@@ -731,9 +721,7 @@ AC_DEFUN(BASH_FUNC_GETCWD,
 AC_CACHE_VAL(bash_cv_getcwd_malloc,
 [AC_TRY_RUN([
 #include <stdio.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdlib.h>
 
 int
@@ -810,9 +798,7 @@ AC_DEFUN(BASH_FUNC_POSIX_SETJMP,
 AC_MSG_CHECKING(for presence of POSIX-style sigsetjmp/siglongjmp)
 AC_CACHE_VAL(bash_cv_func_sigsetjmp,
 [AC_TRY_RUN([
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <sys/types.h>
 #include <signal.h>
 #include <setjmp.h>
@@ -1084,9 +1070,7 @@ AC_CACHE_VAL(bash_cv_dirent_has_dino,
 [AC_TRY_COMPILE([
 #include <stdio.h>
 #include <sys/types.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h> /* HAVE_UNISTD_H */
 #if defined(HAVE_DIRENT_H)
 # include <dirent.h>
 #else
@@ -1117,9 +1101,7 @@ AC_CACHE_VAL(bash_cv_dirent_has_d_fileno,
 [AC_TRY_COMPILE([
 #include <stdio.h>
 #include <sys/types.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h> /* HAVE_UNISTD_H */
 #if defined(HAVE_DIRENT_H)
 # include <dirent.h>
 #else
@@ -1150,9 +1132,7 @@ AC_CACHE_VAL(bash_cv_dirent_has_d_namlen,
 [AC_TRY_COMPILE([
 #include <stdio.h>
 #include <sys/types.h>
-#ifdef HAVE_UNISTD_H
-# include <unistd.h>
-#endif /* HAVE_UNISTD_H */
+#include <unistd.h> /* HAVE_UNISTD_H */
 #if defined(HAVE_DIRENT_H)
 # include <dirent.h>
 #else
@@ -1280,9 +1260,7 @@ AC_DEFUN(BASH_SYS_PGRP_SYNC,
 AC_MSG_CHECKING(whether pgrps need synchronization)
 AC_CACHE_VAL(bash_cv_pgrp_pipe,
 [AC_TRY_RUN([
-#ifdef HAVE_UNISTD_H
-#  include <unistd.h>
-#endif
+#include <unistd.h>
 #ifdef HAVE_SYS_WAIT_H
 #  include <sys/wait.h>
 #endif
@@ -1349,9 +1327,7 @@ AC_MSG_CHECKING([if signal handlers must be reinstalled when invoked])
 AC_CACHE_VAL(bash_cv_must_reinstall_sighandlers,
 [AC_TRY_RUN([
 #include <signal.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdlib.h>
 
 typedef RETSIGTYPE sigfunc();
@@ -1412,9 +1388,7 @@ AC_CACHE_VAL(bash_cv_job_control_missing,
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <signal.h>
 
 /* add more tests in here as appropriate */
@@ -1464,9 +1438,7 @@ AC_CACHE_VAL(bash_cv_sys_named_pipes,
 [AC_TRY_RUN([
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -1589,9 +1561,7 @@ AC_CACHE_VAL(bash_cv_getpw_declared,
 [AC_EGREP_CPP(getpwuid,
 [
 #include <sys/types.h>
-#ifdef HAVE_UNISTD_H
-#  include <unistd.h>
-#endif
+#include <unistd.h>
 #include <pwd.h>
 ],
 bash_cv_getpw_declared=yes,bash_cv_getpw_declared=no)])
@@ -1686,9 +1656,7 @@ dnl
 AC_DEFUN(BASH_CHECK_OFF_T_64,
 [AC_CACHE_CHECK(for 64-bit off_t, bash_cv_off_t_64,
 AC_TRY_COMPILE([
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 #include <sys/types.h>
 ],[
 switch (0) case 0: case (sizeof (off_t) <= 4):;

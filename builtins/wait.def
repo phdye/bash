@@ -111,7 +111,8 @@ int
 wait_builtin (list)
      WORD_LIST *list;
 {
-  int status, code, opt, nflag, wflags;
+  int status, code, opt, nflag;
+  volatile int wflags;
   char *vname;
   SHELL_VAR *pidvar;
   struct procstat pstat;
@@ -180,6 +181,8 @@ wait_builtin (list)
       last_command_exit_signal = wait_signal_received;
       status = 128 + wait_signal_received;
       wait_sigint_cleanup ();
+      if (wflags & JWAIT_WAITING)
+	unset_waitlist ();
       WAIT_RETURN (status);
     }
 
@@ -213,11 +216,11 @@ wait_builtin (list)
 	}
 
       status = wait_for_any_job (wflags, &pstat);
-      if (status < 0)
-	status = 127;
-
       if (vname && status >= 0)
 	bind_var_to_int (vname, pstat.pid);
+
+      if (status < 0)
+	status = 127;
       if (list)
 	unset_waitlist ();
       WAIT_RETURN (status);

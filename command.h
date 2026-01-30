@@ -22,6 +22,7 @@
 #if !defined (_COMMAND_H_)
 #define _COMMAND_H_
 
+#include "general.h"
 #include "stdc.h"
 
 /* Instructions describing what kind of thing to do for a redirection. */
@@ -124,19 +125,7 @@ enum command_type { cm_for, cm_case, cm_while, cm_if, cm_simple, cm_select,
 #define SUBSHELL_PROCSUB 0x20	/* subshell caused by <(command) or >(command) */
 #define SUBSHELL_COPROC	0x40	/* subshell from a coproc pipeline */
 #define SUBSHELL_RESETTRAP 0x80	/* subshell needs to reset trap strings on first call to trap */
-
-/* A structure which represents a word. */
-typedef struct word_desc {
-  char *word;		/* Zero terminated string. */
-  int flags;		/* Flags associated with this word. */
-} WORD_DESC;
-
-/* A linked list of words. */
-typedef struct word_list {
-  struct word_list *next;
-  WORD_DESC *word;
-} WORD_LIST;
-
+#define SUBSHELL_IGNTRAP 0x100  /* subshell should reset trapped signals from trap_handler */
 
 /* **************************************************************** */
 /*								    */

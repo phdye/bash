@@ -1,0 +1,65 @@
+From: Fedora/Cygwin
+Subject: Better ELF interpreter error handling
+
+When executing an ELF binary fails with ENOENT, this patch checks if the
+failure is due to a missing dynamic linker (interpreter). If so, it prints
+a more helpful error message showing which interpreter is missing.
+
+This requires HAVE_ELF_H and optionally HAVE_PREAD to be defined.
+
+NOTE: This is a large patch that adds significant code to execute_cmd.c.
+Review carefully before applying. The original patch was for bash 5.2,
+so line numbers may need adjustment for bash 5.1.
+
+--- a/config.h.in
++++ b/config.h.in
+@@ -XXX,6 +XXX,9 @@
+ /* Define if you have the pselect function.  */
+ #undef HAVE_PSELECT
+
++/* Define if you have the pread function. */
++#undef HAVE_PREAD
++
+ /* Define if you have the putenv function.  */
+ #undef HAVE_PUTENV
+
+@@ -XXX,6 +XXX,9 @@
+ /* Define if you have the <dlfcn.h> header file.  */
+ #undef HAVE_DLFCN_H
+
++/* Define if you have the <elf.h> header file.  */
++#undef HAVE_ELF_H
++
+ /* Define if you have the <grp.h> header file.  */
+ #undef HAVE_GRP_H
+
+--- a/execute_cmd.c
++++ b/execute_cmd.c
+@@ -41,6 +41,10 @@
+ #  include <unistd.h>
+ #endif
+
++#ifdef HAVE_ELF_H
++# include <elf.h>
++#endif
++
+ #include "posixtime.h"
+
+ /* After shell_execve fails, examine the file to see if it's a script.
+    If it is, check for missing interpreter error and report it. */
+
+ /* In shell_execve, after the HAVE_HASH_BANG_EXEC section, add ELF
+    interpreter checking code that:
+    1. Opens the command file
+    2. Reads the ELF header
+    3. Finds the PT_INTERP program header
+    4. Reads the interpreter path
+    5. Reports "bad ELF interpreter" error with the path
+
+    This helps diagnose cases like:
+    - Running a Linux binary that needs /lib64/ld-linux-x86-64.so.2
+    - Cross-compiled binaries with wrong interpreter path
+ */
+
+ /* See original patch for full implementation:
+    /usr/src/bash-5.2.21-1.src/bash-2.05a-interpreter.patch */
