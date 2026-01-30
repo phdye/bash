@@ -1,0 +1,127 @@
+bash-server: unit tests
+=== bash-server protocol unit tests ===
+
+[base64 encode]
+  base64_encode: empty string                        PASS
+  base64_encode: single byte 'f'                     PASS
+  base64_encode: two bytes 'fo'                      PASS
+  base64_encode: three bytes 'foo'                   PASS
+  base64_encode: 'Hello, World!'                     PASS
+  base64_encode: binary data with NULs               PASS
+
+[base64 decode]
+  base64_decode: empty string                        PASS
+  base64_decode: 'Zg==' -> 'f'                       PASS
+  base64_decode: 'SGVsbG8sIFdvcmxkIQ=='              PASS
+  base64_decode: invalid length (not multiple of 4)  PASS
+  base64_roundtrip: encode then decode               PASS
+  base64_roundtrip: all 256 byte values              PASS
+
+[secure_compare]
+  secure_compare: equal strings                      PASS
+  secure_compare: different strings                  PASS
+  secure_compare: different lengths                  PASS
+  secure_compare: two empty strings                  PASS
+  secure_compare: one empty, one not                 PASS
+  secure_compare: 64-char hex tokens (match)         PASS
+  secure_compare: 64-char hex tokens (last char differs) PASS
+
+[parse_command]
+  parse_command: 'AUTH token123'                     PASS
+  parse_command: 'PING' (no argument)                PASS
+  parse_command: 'auth token' (lowercase -> uppercase) PASS
+  parse_command: '  PING' (leading whitespace)       PASS
+  parse_command: '' (empty string)                   PASS
+  parse_command: '   ' (whitespace only)             PASS
+  parse_command: 'EVAL echo hello world'             PASS
+  parse_command: 'AUTH token   ' (trailing whitespace) PASS
+  parse_command: 'AUTH   token' (multiple spaces)    PASS
+
+[read/write line]
+  write_line + read_line: simple message             PASS
+  write_line + read_line: formatted '%s %d'          PASS
+  read_line: EOF returns -1                          PASS
+  read_line: strips CR from CRLF                     PASS
+  read_line: reads multiple lines sequentially       PASS
+  write_line + read_line: empty format string        PASS
+
+=== Results: 34/34 passed, 0 failed ===
+=== bash-server socket unit tests ===
+
+[socket creation]
+  server_socket_create: creates socket file               PASS
+  server_socket_create: socket file is mode 0600          PASS
+  server_socket_create: replaces stale socket file        PASS
+  server_socket_close: removes socket file                PASS
+  server_socket_create: rejects overly long path          PASS
+
+[socket accept/connect]
+  server_accept_client: accepts a connection              PASS
+
+[socket nonblocking]
+  server_socket_set_nonblocking: sets O_NONBLOCK          PASS
+  server_socket_set_blocking: clears O_NONBLOCK           PASS
+
+=== Results: 8/8 passed, 0 failed ===
+=== bash-server config/auth unit tests ===
+
+[ensure_directory]
+  ensure_directory: creates new directory                 PASS
+  ensure_directory: existing directory returns 0          PASS
+  ensure_directory: file at path returns ENOTDIR          PASS
+  ensure_directory: directory created with mode 0700      PASS
+
+[read_config_file]
+  read_config_file: reads socket directive                PASS
+  read_config_file: skips comments and blank lines        PASS
+  read_config_file: CLI-set path not overridden           PASS
+  read_config_file: missing file is not an error          PASS
+  read_config_file: handles leading/trailing whitespace   PASS
+
+[resolve_socket_path]
+  resolve_socket_path: CLI path takes precedence          PASS
+  resolve_socket_path: env var used when no CLI           PASS
+  resolve_socket_path: falls back to /tmp default         PASS
+  resolve_socket_path: XDG_RUNTIME_DIR used               PASS
+
+[generate_auth_token]
+  generate_auth_token: produces 64-char hex token         PASS
+  generate_auth_token: creates .token file with 0600      PASS
+  generate_auth_token: file contains token + newline      PASS
+  generate_auth_token: two calls produce different tokens PASS
+
+[parse_arguments]
+  parse_arguments: defaults (no args)                     PASS
+  parse_arguments: --socket /my/sock                      PASS
+  parse_arguments: -d -v                                  PASS
+  parse_arguments: -m 25                                  PASS
+  parse_arguments: -m 0 (clamped to 1)                    PASS
+  parse_arguments: -m -5 (clamped to 1)                   PASS
+
+=== Results: 23/23 passed, 0 failed ===
+bash-server: integration tests
+  PASS: token file permissions = 0600
+  PASS: token is 64 lowercase hex chars
+  PASS: PID file created
+  PASS: PID file contains correct PID
+  PASS: PING returns PONG
+  PASS: AUTH with bad token returns ERR
+  PASS: AUTH with valid token returns OK
+  PASS: AUTH with no token returns ERR
+  PASS: AUTH twice returns OK (already authenticated)
+  PASS: QUIT returns BYE
+  PASS: unknown command returns ERR
+  PASS: server exits on SIGTERM
+  PASS: EVAL without auth returns ERR
+  PASS: EVAL echo hello produces STDOUT with base64
+  PASS: EVAL echo hello exits with 0
+  PASS: EVAL false returns nonzero exit
+  PASS: EVAL stderr produces STDERR line
+  PASS: EVAL variable expansion produces output
+  PASS: EVAL with no command returns ERR
+  PASS: bashclient CLI: echo works
+  PASS: Python PING returns PONG
+  PASS: Python AUTH returns OK
+  PASS: Python EVAL produces STDOUT
+  PASS: Python EVAL exits with 0
+  PASS: Python QUIT returns BYE

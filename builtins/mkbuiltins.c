@@ -744,8 +744,8 @@ remove_trailing_whitespace (
 char *
 get_arg (
      char *for_whom,
-     char *string,
-     DEF_FILE *defs
+     DEF_FILE *defs,
+     char *string
 )
 {
   char *new;

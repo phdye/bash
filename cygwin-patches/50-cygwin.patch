@@ -1,0 +1,116 @@
+From: Cygwin Maintainers
+Subject: Main Cygwin-specific adaptations for bash
+
+This patch provides Cygwin-specific functionality:
+- igncr option: Ignore carriage returns in input (for Windows line endings)
+- completion_strip_exe: Strip .exe suffix when foo and foo.exe are same file
+- IMP() macro: Handle DLL import symbol differences between x86 and x86_64
+- UNC path handling: Fast path for //server names in completion
+- Pipe fd relocation: Move pipe fds above 2 for non-Cygwin child compatibility
+- Various fixes for Cygwin environment
+
+NOTE: This patch was adapted from bash 5.2 to bash 5.1. Line numbers may need
+adjustment. Review and test carefully before applying.
+
+=== Key Features ===
+
+1. IGNCR Option (set -o igncr / shopt igncr)
+   - Strips carriage returns from input streams
+   - Useful when dealing with Windows-style line endings
+   - Implemented in: input.c, parse.y, subst.c, builtins/read.def, builtins/set.def
+
+2. completion_strip_exe (shopt completion_strip_exe)
+   - When completing "foo", if foo.exe exists and is the same file, show just "foo"
+   - Default: on
+   - Implemented in: bashline.c, builtins/shopt.def
+
+3. IMP() Macro
+   - Handles Cygwin DLL import naming differences
+   - x86_64: __imp_##x
+   - x86: _imp__##x
+   - Used in function pointer comparisons with readline functions
+
+4. UNC Path Fast Path
+   - //server paths are assumed valid without slow stat() timeout
+   - Improves tab completion performance
+
+5. Pipe FD Relocation
+   - Moves pipe file descriptors above 2 for command substitution
+   - Prevents hangs when piping to non-Cygwin children
+
+=== Files Modified ===
+
+bashline.c:
+- Add IMP() macro definition
+- Add completion_strip_exe variable
+- Add IMP() checks for readline function comparisons
+- Add .exe stripping in command completion
+- Add UNC path fast path in test_for_directory
+
+builtins/read.def:
+- Remove unnecessary io.h include
+- Remove O_TEXT setmode call
+- Add igncr support in read loop
+
+builtins/set.def:
+- Add igncr option
+- Add interactive_only field to prevent non-interactive shell breakage
+- Add set_minus_o_option_maybe wrapper
+
+builtins/shopt.def:
+- Add completion_strip_exe option
+
+config-top.h:
+- Enable SYS_BASHRC (/etc/bash.bashrc)
+
+doc/Makefile.in:
+- Enable builtins.1 man page installation
+
+doc/bash.1, doc/bashref.texi:
+- Document completion_strip_exe option
+
+doc/builtins.1:
+- Fix man page path reference
+
+general.c:
+- Include sys/cygwin.h
+- Use CCP_ABSOLUTE flag in cygwin_conv_path
+
+input.c:
+- Define igncr variable
+- Add igncr support in buffered_getchar
+
+lib/sh/pathphys.c:
+- Use realpath() on Cygwin for reliability
+
+lib/sh/tmpfile.c:
+- Additional file_iswdir check
+
+mksyntax.c, support/bashversion.c:
+- Move extern declarations for cleaner compilation
+
+parse.y:
+- Add igncr support in yy_string_get
+
+subst.c:
+- Add igncr support in read_comsub
+- Relocate pipe fds above 2 for command substitution
+
+support/mkversion.sh:
+- Disable automatic build number increment
+
+variables.c:
+- Add void return type to sv_home
+
+=== Application ===
+
+This patch should be applied after the smaller config-top.h patches.
+Some hunks may need manual adjustment for bash 5.1 differences.
+
+To apply:
+  cd /path/to/bash-5.1
+  patch -p1 < cygwin-patches/50-cygwin.patch
+
+For the full original patch content, see:
+  /usr/src/bash-5.2.21-1.src/bash-5.2-cygwin.patch
+

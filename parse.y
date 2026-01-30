@@ -4508,6 +4508,8 @@ xparse_dolparen (
     sflags |= SEVAL_NOLONGJMP;
   save_parser_state (&ps);
   save_input_line_state (&ls);
+  /* avoid echoing every substitution again */
+  echo_input_at_read = 0;
   orig_eof_token = shell_eof_token;
 #if defined (ALIAS) || defined (DPAREN_ARITHMETIC)
   saved_pushed_strings = pushed_string_list;	/* separate parsing context */

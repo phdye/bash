@@ -1,0 +1,18 @@
+From: Fedora/Cygwin
+Subject: Call stupidly_hack_special_variables in set_var_attribute
+
+When setting attributes on special variables (like locale variables),
+the special variable hooks need to be called. This patch adds a call
+to stupidly_hack_special_variables at the end of set_var_attribute
+to ensure special variable handling is triggered.
+
+--- a/builtins/setattr.def
++++ b/builtins/setattr.def
+@@ -659,4 +659,7 @@ set_var_attribute (name, attribute, undo)
+ 
+   if (var && (exported_p (var) || (attribute & att_exported)))
+     array_needs_making++;	/* XXX */
++
++  if (var)
++    stupidly_hack_special_variables (name);
+ }

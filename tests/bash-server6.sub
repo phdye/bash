@@ -1,0 +1,194 @@
+# bash-server6.sub -- Integration: Python client fallback
+#
+# Verifies that Python AF_UNIX clients can connect to bash-server on
+# Cygwin.  This tests the SO_PEERCRED handshake disable that allows
+# CPython's non-blocking connect pattern to work with Cygwin's AF_LOCAL
+# credential exchange.  Skipped if python3 is not available.
+
+: ${BUILD_DIR:=..}
+
+SERVER_BIN=${BUILD_DIR}/bash-server/bash-server
+
+# Find binary
+for ext in .exe ""; do
+    [ -x "${SERVER_BIN}${ext}" ] && SERVER_BIN="${SERVER_BIN}${ext}" && break
+done
+
+if [ ! -x "$SERVER_BIN" ]; then
+    echo "bash-server6.sub: SKIPPED (server binary not found)"
+    exit 0
+fi
+
+# Check for python3
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "bash-server6.sub: SKIPPED (python3 not found)"
+    exit 0
+fi
+
+# Verify python3 has AF_UNIX support
+if ! python3 -c "import socket; socket.AF_UNIX" 2>/dev/null; then
+    echo "bash-server6.sub: SKIPPED (python3 lacks AF_UNIX)"
+    exit 0
+fi
+
+# Set up temp directory
+TESTDIR=$(mktemp -d /tmp/bash-server-test6.XXXXXX)
+SOCK="${TESTDIR}/sock"
+TOKFILE="${SOCK}.token"
+
+cleanup() {
+    if [ -n "$SERVER_PID" ] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill "$SERVER_PID" 2>/dev/null
+        for i in $(seq 1 30); do
+            kill -0 "$SERVER_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -9 "$SERVER_PID" 2>/dev/null
+        wait "$SERVER_PID" 2>/dev/null
+    fi
+    rm -rf "$TESTDIR"
+}
+trap cleanup EXIT
+
+failed=0
+pass() { echo "  PASS: $1"; }
+fail() { echo "  FAIL: $1"; failed=$((failed + 1)); }
+
+# --- Start server with --no-peercred for Python compatibility ---
+"$SERVER_BIN" --socket "$SOCK" --no-peercred --verbose &
+SERVER_PID=$!
+
+# Wait for socket to appear (up to 5s)
+for i in $(seq 1 50); do
+    [ -S "$SOCK" ] && [ -f "$TOKFILE" ] && break
+    sleep 0.1
+done
+
+if [ ! -S "$SOCK" ]; then
+    fail "server did not create socket within 5s"
+    exit 1
+fi
+
+TOKEN=$(cat "$TOKFILE" | tr -d '\n\r')
+
+# --- Test: Python PING/PONG ---
+PY_PING=$(timeout 10 python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+try:
+    s.connect('$SOCK')
+    s.sendall(b'PING\n')
+    resp = s.recv(4096).decode().strip()
+    print(resp)
+except Exception as e:
+    print('CONNECT_ERROR: ' + str(e), file=sys.stderr)
+    sys.exit(1)
+finally:
+    s.close()
+" 2>/dev/null)
+if [ "$PY_PING" = "PONG" ]; then
+    pass "Python PING returns PONG"
+else
+    fail "Python PING: got '$PY_PING'"
+fi
+
+# --- Test: Python AUTH with valid token ---
+PY_AUTH=$(timeout 10 python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+try:
+    s.connect('$SOCK')
+    s.sendall(b'AUTH $TOKEN\n')
+    resp = s.recv(4096).decode().strip()
+    print(resp)
+except Exception as e:
+    print('CONNECT_ERROR: ' + str(e), file=sys.stderr)
+    sys.exit(1)
+finally:
+    s.close()
+" 2>/dev/null)
+if [ "$PY_AUTH" = "OK" ]; then
+    pass "Python AUTH returns OK"
+else
+    fail "Python AUTH: got '$PY_AUTH'"
+fi
+
+# --- Test: Python EVAL echo ---
+PY_EVAL=$(timeout 10 python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+try:
+    s.connect('$SOCK')
+    s.sendall(b'AUTH $TOKEN\n')
+    auth = s.recv(4096).decode().strip()
+    if not auth.startswith('OK'):
+        print('AUTH_FAILED: ' + auth, file=sys.stderr)
+        sys.exit(1)
+    s.sendall(b'EVAL echo hello-from-python\n')
+    # Read until EXIT line
+    data = b''
+    while True:
+        chunk = s.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+        if b'EXIT' in data:
+            break
+    for line in data.decode().strip().split('\n'):
+        print(line)
+    s.sendall(b'QUIT\n')
+except Exception as e:
+    print('ERROR: ' + str(e), file=sys.stderr)
+    sys.exit(1)
+finally:
+    s.close()
+" 2>/dev/null)
+if echo "$PY_EVAL" | grep -q "STDOUT"; then
+    pass "Python EVAL produces STDOUT"
+else
+    fail "Python EVAL: got '$PY_EVAL'"
+fi
+if echo "$PY_EVAL" | grep -q "EXIT 0"; then
+    pass "Python EVAL exits with 0"
+else
+    fail "Python EVAL exit: got '$(echo "$PY_EVAL" | grep EXIT)'"
+fi
+
+# --- Test: Python QUIT ---
+PY_QUIT=$(timeout 10 python3 -c "
+import socket, sys
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(5)
+try:
+    s.connect('$SOCK')
+    s.sendall(b'QUIT\n')
+    resp = s.recv(4096).decode().strip()
+    print(resp)
+except Exception as e:
+    print('CONNECT_ERROR: ' + str(e), file=sys.stderr)
+    sys.exit(1)
+finally:
+    s.close()
+" 2>/dev/null)
+if [ "$PY_QUIT" = "BYE" ]; then
+    pass "Python QUIT returns BYE"
+else
+    fail "Python QUIT: got '$PY_QUIT'"
+fi
+
+# --- Shutdown ---
+kill "$SERVER_PID" 2>/dev/null
+for i in $(seq 1 30); do
+    kill -0 "$SERVER_PID" 2>/dev/null || break
+    sleep 0.1
+done
+SERVER_PID=""
+
+# --- Summary ---
+if [ $failed -gt 0 ]; then
+    echo "bash-server6.sub: $failed test(s) FAILED"
+    exit 1
+fi

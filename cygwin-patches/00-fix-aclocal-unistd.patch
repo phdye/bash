@@ -1,0 +1,35 @@
+From: Local fix
+Subject: Fix implicit function declarations in aclocal.m4 test programs
+
+Modern compilers (GCC 14+) treat implicit function declarations as errors.
+The test programs in aclocal.m4 use close(), unlink(), rmdir(), write()
+but only conditionally include <unistd.h> via #ifdef HAVE_UNISTD_H.
+
+The problem is HAVE_UNISTD_H isn't defined when configure compiles these
+test programs - it comes from config.h which doesn't exist yet.
+
+Fix: Include <unistd.h> unconditionally since all POSIX systems have it.
+
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -330,9 +330,7 @@ AC_CACHE_VAL(bash_cv_opendir_not_robust,
+ #include <stdio.h>
+ #include <sys/types.h>
+ #include <fcntl.h>
+-#ifdef HAVE_UNISTD_H
+-# include <unistd.h>
+-#endif /* HAVE_UNISTD_H */
++#include <unistd.h>
+ #ifdef HAVE_SYS_STAT_H
+ #include <sys/stat.h>
+ #endif
+@@ -1465,9 +1463,7 @@ AC_CACHE_VAL(bash_cv_sys_named_pipes,
+ [AC_TRY_RUN([
+ #include <sys/types.h>
+ #include <sys/stat.h>
+-#ifdef HAVE_UNISTD_H
+ #include <unistd.h>
+-#endif
+ #include <stdio.h>
+ #include <stdlib.h>
+ 

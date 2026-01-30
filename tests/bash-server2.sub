@@ -1,0 +1,37 @@
+# bash-server2.sub -- Socket unit tests
+#
+# Builds and runs test_socket which tests:
+#   - Socket creation (basic, permissions 0600, stale replacement)
+#   - Socket close (file removal)
+#   - Socket path validation (too-long path rejected)
+#   - Accept/connect via fork+connect
+#   - Nonblocking/blocking mode toggle
+
+: ${BUILD_DIR:=..}
+TEST_DIR=${BUILD_DIR}/bash-server/tests
+
+# Build test if needed
+if [ ! -x "${TEST_DIR}/test_socket" ] && [ ! -x "${TEST_DIR}/test_socket.exe" ]; then
+    make -C "${TEST_DIR}" test_socket 2>/dev/null || {
+        echo "bash-server2.sub: FAIL (cannot build test_socket)"
+        exit 1
+    }
+fi
+
+# Find the binary
+if [ -x "${TEST_DIR}/test_socket.exe" ]; then
+    TEST_BIN="${TEST_DIR}/test_socket.exe"
+elif [ -x "${TEST_DIR}/test_socket" ]; then
+    TEST_BIN="${TEST_DIR}/test_socket"
+else
+    echo "bash-server2.sub: FAIL (test_socket not found)"
+    exit 1
+fi
+
+# Run with timeout
+timeout 30 "$TEST_BIN"
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "bash-server2.sub: FAIL (exit code $rc)"
+    exit 1
+fi

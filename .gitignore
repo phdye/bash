@@ -92,3 +92,26 @@ examples/loadables/tty
 examples/loadables/uname
 examples/loadables/unlink
 examples/loadables/whoami
+
+# Additional build artifacts
+*.log
+*.dll
+*.exe
+version.h
+Makefile.wasm
+
+# Generated Makefiles not in original .gitignore
+lib/termcap/Makefile
+lib/tilde/Makefile
+examples/loadables/Makefile.inc
+examples/loadables/perl/Makefile
+
+# Additional loadable builtins
+examples/loadables/asort
+examples/loadables/cat
+examples/loadables/event_server
+examples/loadables/hello
+examples/loadables/necho
+examples/loadables/printenv
+examples/loadables/pushd
+examples/loadables/stat

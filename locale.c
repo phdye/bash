@@ -78,8 +78,6 @@ set_default_locale ()
 {
 #if defined (HAVE_SETLOCALE)
   default_locale = setlocale (LC_ALL, "");
-  if (default_locale)
-    default_locale = savestring (default_locale);
 #else
   default_locale = savestring ("C");
 #endif /* HAVE_SETLOCALE */

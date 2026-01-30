@@ -1,0 +1,15 @@
+From: Fedora/Cygwin
+Subject: Document POSIX mode ulimit behavior
+
+In POSIX mode, ulimit -c and -f options use 512-byte blocks instead
+of the default 1024-byte blocks. This patch documents that behavior.
+
+--- a/doc/bash.1
++++ b/doc/bash.1
+@@ -10742,6 +10742,7 @@ which are in 512-byte increments.
+ The return status is 0 unless an invalid option or argument is supplied,
+ or an error occurs while setting a new limit.
++In POSIX Mode 512-byte blocks are used for the `-c' and `-f' options.
+ .RE
+ .TP
+ \fBumask\fP [\fB\-p\fP] [\fB\-S\fP] [\fImode\fP]

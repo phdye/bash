@@ -89,7 +89,8 @@ SHOBJ_CFLAGS = @SHOBJ_CFLAGS@
 SHOBJ_LD = @SHOBJ_LD@
 SHOBJ_LDFLAGS = @SHOBJ_LDFLAGS@ @LDFLAGS@
 SHOBJ_XLDFLAGS = @SHOBJ_XLDFLAGS@
-SHOBJ_LIBS = @SHOBJ_LIBS@
+# Cygwin: loadables need to link against bash DLL import library
+SHOBJ_LIBS = @SHOBJ_LIBS@ -L$(BUILD_DIR) -lcygbash
 SHOBJ_STATUS = @SHOBJ_STATUS@
 
 INC = -I. -I.. -I$(topdir) -I$(topdir)/lib -I$(topdir)/builtins -I${srcdir} \
@@ -104,7 +105,7 @@ ALLPROG = print truefalse sleep finfo logname basename dirname fdflags \
 	  tty pathchk tee head mkdir rmdir mkfifo mktemp printenv id whoami \
 	  uname sync push ln unlink realpath strftime mypid setpgid seq rm \
 	  accept csv cut
-OTHERPROG = necho hello cat pushd stat asort
+OTHERPROG = necho hello cat pushd stat asort event_server
 
 all:	$(SHOBJ_STATUS)
 
@@ -236,6 +237,9 @@ stat:	stat.o
 asort:	asort.o
 	$(SHOBJ_LD) $(SHOBJ_LDFLAGS) $(SHOBJ_XLDFLAGS) -o $@ asort.o $(SHOBJ_LIBS)
 
+event_server:	event_server.o
+	$(SHOBJ_LD) $(SHOBJ_LDFLAGS) $(SHOBJ_XLDFLAGS) -o $@ event_server.o $(SHOBJ_LIBS)
+
 # pushd is a special case.  We use the same source that the builtin version
 # uses, with special compilation options.
 #
@@ -322,3 +326,4 @@ stat.o: stat.c
 fdflags.o: fdflags.c
 seq.o: seq.c
 asort.o: asort.c
+event_server.o: event_server.c

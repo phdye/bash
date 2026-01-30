@@ -1,0 +1,18 @@
+From: Fedora/Cygwin
+Subject: Enable DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS
+
+Suppresses EPIPE error messages from builtins like echo and printf
+when writing to a broken pipe. This is commonly desired behavior.
+
+--- a/config-top.h
++++ b/config-top.h
+@@ -58,7 +58,7 @@ typedef void *sh_parser_state_t;
+ 
+ /* Define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS if you don't want builtins
+    like `echo' and `printf' to report errors when output does not succeed
+    due to EPIPE. */
+-/* #define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS */
++#define DONT_REPORT_BROKEN_PIPE_WRITE_ERRORS
+ 
+ /* The default value of the PATH variable. */
+ #ifndef DEFAULT_PATH_VALUE

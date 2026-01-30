@@ -1,0 +1,72 @@
+From: Cygwin loadable modules support
+Subject: Build bash as DLL to enable loadable builtins on Cygwin
+
+On Cygwin/Windows, loadable builtins need to link against bash's symbols
+via an import library. This patch:
+1. Builds cygbash-5.1.dll containing the shell core
+2. Builds bash.exe linking against the DLL  
+3. Creates libcygbash.dll.a import library for loadables
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -107,6 +107,13 @@ EXEEXT = @EXEEXT@
+ OBJEXT = @OBJEXT@
+ 
+ Program = bash$(EXEEXT)
++
++# Cygwin DLL support for loadable builtins
++BASH_DLL = cygbash-@PACKAGE_VERSION@.dll
++BASH_IMPLIB = libcygbash.dll.a
++DLL_LDFLAGS = -shared -Wl,--export-all-symbols -Wl,--enable-auto-import \
++	-Wl,--out-implib,$(BASH_IMPLIB)
++
+ MACHTYPE = @MACHTYPE@
+ 
+ # The Program without EXEEXT, for documentation targets
+@@ -479,6 +486,10 @@ OBJECTS	 = shell.o eval.o y.tab.o general.o make_cmd.o print_cmd.o $(GLOBO) \
+ 	   bashline.o $(SIGLIST_O) list.o stringlib.o locale.o findcmd.o redir.o \
+ 	   pcomplete.o pcomplib.o syntax.o xmalloc.o $(SIGNAMES_O)
+ 
++# Objects for DLL (everything except shell.o which has main())
++DLL_OBJECTS = eval.o y.tab.o general.o make_cmd.o print_cmd.o $(GLOBO) \
++	   dispose_cmd.o execute_cmd.o variables.o copy_cmd.o error.o \
++	   expr.o flags.o $(JOBS_O) subst.o hashcmd.o hashlib.o mailcheck.o \
++	   trap.o input.o unwind_prot.o pathexp.o sig.o test.o version.o \
++	   alias.o array.o arrayfunc.o assoc.o braces.o bracecomp.o bashhist.o \
++	   bashline.o $(SIGLIST_O) list.o stringlib.o locale.o findcmd.o redir.o \
++	   pcomplete.o pcomplib.o syntax.o xmalloc.o $(SIGNAMES_O)
++
+ # Where the source code of the shell builtins resides.
+ BUILTIN_SRCDIR=$(srcdir)/builtins
+ DEFSRC=$(BUILTIN_SRCDIR)
+@@ -578,11 +593,26 @@ SIGNAMES_SUPPORT = $(SUPPORT_SRC)mksignames.c
+ .made: $(Program) bashbug $(SDIR)/man2html$(EXEEXT)
+ 	@echo "$(Program) last made for a $(Machine) running $(OS)" >.made
+ 
+-$(Program):  .build $(OBJECTS) $(BUILTINS_DEP) $(LIBDEP)
++# Standard monolithic build (non-Cygwin or when DLL not needed)
++$(Program)-monolithic:  .build $(OBJECTS) $(BUILTINS_DEP) $(LIBDEP)
+ 	$(RM) $@
+-	$(PURIFY) $(CC) $(BUILTINS_LDFLAGS) $(LIBRARY_LDFLAGS) $(LDFLAGS) -o $(Program) $(OBJECTS) $(LIBS)
+-	ls -l $(Program)
+-	-$(SIZE) $(Program)
++	$(PURIFY) $(CC) $(BUILTINS_LDFLAGS) $(LIBRARY_LDFLAGS) $(LDFLAGS) -o $(Program) $(OBJECTS) $(LIBS)
++	ls -l $(Program)
++	-$(SIZE) $(Program)
++
++# Cygwin DLL build for loadable modules support
++$(BASH_DLL): .build $(DLL_OBJECTS) $(BUILTINS_DEP) $(LIBDEP)
++	$(RM) $@ $(BASH_IMPLIB)
++	$(CC) $(DLL_LDFLAGS) $(BUILTINS_LDFLAGS) $(LIBRARY_LDFLAGS) $(LDFLAGS) \
++		-o $@ $(DLL_OBJECTS) $(LIBS)
++	ls -l $(BASH_DLL) $(BASH_IMPLIB)
++
++# bash.exe links against the DLL
++$(Program): .build shell.o $(BASH_DLL)
++	$(RM) $@
++	$(CC) $(LDFLAGS) -o $@ shell.o -L. -lcygbash
++	ls -l $(Program)
++	-$(SIZE) $(Program)
+ 
+ .build:	$(SOURCES) config.h Makefile version.h $(VERSPROG)
+ 	@echo

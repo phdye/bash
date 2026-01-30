@@ -1,0 +1,40 @@
+# bash-server1.sub -- Protocol unit tests
+#
+# Builds and runs test_protocol which tests:
+#   - Base64 encode/decode (empty, single, multi-byte, binary, roundtrip)
+#   - Constant-time secure compare (equal, differ, length mismatch, empty)
+#   - Protocol command parsing (AUTH, PING, EVAL, whitespace handling)
+#   - Line read/write via socketpair (simple, formatted, EOF, CRLF, multiple)
+
+: ${BUILD_DIR:=..}
+TEST_DIR=${BUILD_DIR}/bash-server/tests
+
+# Build test if needed
+if [ ! -x "${TEST_DIR}/test_protocol" ] && [ ! -x "${TEST_DIR}/test_protocol.exe" ]; then
+    make -C "${TEST_DIR}" test_protocol$(${BUILD_DIR}/bash-server/bash-server --help >/dev/null 2>&1 && echo .exe) 2>/dev/null
+    if [ $? -ne 0 ]; then
+        # Try with explicit EXEEXT
+        make -C "${TEST_DIR}" 'test_protocol' 2>/dev/null || {
+            echo "bash-server1.sub: FAIL (cannot build test_protocol)"
+            exit 1
+        }
+    fi
+fi
+
+# Find the binary
+if [ -x "${TEST_DIR}/test_protocol.exe" ]; then
+    TEST_BIN="${TEST_DIR}/test_protocol.exe"
+elif [ -x "${TEST_DIR}/test_protocol" ]; then
+    TEST_BIN="${TEST_DIR}/test_protocol"
+else
+    echo "bash-server1.sub: FAIL (test_protocol not found)"
+    exit 1
+fi
+
+# Run with timeout
+timeout 10 "$TEST_BIN"
+rc=$?
+if [ $rc -ne 0 ]; then
+    echo "bash-server1.sub: FAIL (exit code $rc)"
+    exit 1
+fi
