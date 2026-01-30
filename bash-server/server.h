@@ -73,8 +73,13 @@
 #define SERVER_TOKEN_HEXLEN (SERVER_TOKEN_BYTES * 2)
 
 /* Protocol versions */
-#define PROTOCOL_V1  1   /* Line-oriented text protocol */
-#define PROTOCOL_V2  2   /* Length-prefixed JSON frames */
+#define PROTOCOL_V1       1   /* Line-oriented text protocol */
+#define PROTOCOL_V2       2   /* Length-prefixed JSON frames */
+#define PROTOCOL_V2_NDJSON 3  /* Newline-delimited JSON (NDJSON) */
+
+/* Wire format for v2 (set once per session, checked by frame I/O) */
+#define WIRE_BINARY  0
+#define WIRE_NDJSON  1
 
 /* v2 frame header: channel(1) + flags(1) + length(4) = 6 bytes */
 #define FRAME_HEADER_SIZE  6
@@ -129,7 +134,8 @@ typedef struct client_session {
     int   fd;           /* Primary fd (for socketpair/socket: same for read+write) */
     int   write_fd;     /* Write fd (-1 means use fd for both read and write) */
     int   authenticated;
-    int   protocol_version;  /* PROTOCOL_V1 or PROTOCOL_V2 */
+    int   protocol_version;  /* PROTOCOL_V1, PROTOCOL_V2, or PROTOCOL_V2_NDJSON */
+    int   wire_format;       /* WIRE_BINARY or WIRE_NDJSON */
     pid_t pid;
     int   stdout_pipe[2];
     int   stderr_pipe[2];
@@ -195,6 +201,10 @@ int  json_session_handle(client_session_t *session, server_config_t *config);
 /* JSON helpers (server_json.c) */
 const char *json_get_string(const char *json, const char *key, char *buf, size_t bufsize);
 int  json_get_int(const char *json, const char *key, int *value);
+
+/* Wire format control (server_json.c) — process-global, set once per session */
+void json_set_wire_format(int format);
+int  json_get_wire_format(void);
 
 /* Protocol version detection */
 int  protocol_detect_version(int fd, char *first_byte);
