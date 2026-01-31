@@ -2,13 +2,13 @@
 
 # DESCRIPTION
 
-The bash-server project provides four official client bindings for
+The bash-server project provides six official client bindings for
 interacting with the bash-server v2 NDJSON protocol.  Each binding
 implements the same logical API over the same wire protocol, differing
 only in language idioms, concurrency model, and memory management
 conventions.
 
-This page describes the unified architecture shared by all four
+This page describes the unified architecture shared by all six
 bindings, the common API lifecycle, and the feature matrix that
 distinguishes them.  Per-language details are covered in dedicated
 man pages.
@@ -17,7 +17,7 @@ man pages.
 
 # Available bindings
 
-Four client bindings are available, each in its own subdirectory under
+Six client bindings are available, each in its own subdirectory under
 `clients/`:
 
 | Binding    | Package              | Version | Language   | Directory          |
@@ -26,6 +26,8 @@ Four client bindings are available, each in its own subdirectory under
 | TypeScript | `bashclient`         | 0.1.0   | Node.js 16+| `clients/typescript`|
 | C          | `libbashclient`      | 0.1.0   | C99/POSIX  | `clients/c`        |
 | Java       | `org.gnu.bash:bashclient` | 0.1.0 | Java 11+ | `clients/java`     |
+| Go         | `bashclient`         | 0.1.0   | Go 1.21+   | `clients/go`       |
+| C#         | `BashServer.Client`  | 0.1.0   | .NET 6.0+  | `clients/csharp`   |
 
 All bindings target the v2 NDJSON wire format.  None depend on the
 binary v2 frame format -- NDJSON is the standard client-side protocol.
@@ -40,10 +42,12 @@ Each binding is designed with minimal external dependencies:
 | TypeScript | stdlib only (net, child_process)| jest, ts-jest                   |
 | C          | POSIX libc only                 | none (built-in test harness)    |
 | Java       | junixsocket, Jackson            | JUnit 5                         |
+| Go         | stdlib only (net, encoding/json)| stdlib testing package           |
+| C#         | stdlib only (System.Text.Json)  | xUnit                           |
 
 # Unified architecture
 
-All four bindings follow the same layered architecture:
+All six bindings follow the same layered architecture:
 
 ```
   errors  -->  types  -->  protocol  -->  transport  -->  channels  -->  client
@@ -149,25 +153,46 @@ try (BashClient client = BashClient.connect("/tmp/bash-server-1000/sock")) {
 }
 ```
 
+**Go** (goroutine-based with context):
+
+```go
+client, err := bashclient.Connect(ctx, "/tmp/bash-server-1000/sock")
+if err != nil { log.Fatal(err) }
+defer client.Close()
+client.Auth(ctx, token)
+result, _ := client.Eval(ctx, "echo hello")
+fmt.Print(result.Stdout)
+```
+
+**C#** (Task-based async/await):
+
+```csharp
+await using var client = await BashClient.ConnectAsync("/tmp/bash-server-1000/sock");
+await client.AuthAsync(token);
+var result = await client.EvalAsync("echo hello");
+Console.Write(result.Stdout);
+```
+
 # Feature matrix
 
-| Feature              | Python      | TypeScript  | C             | Java         |
-|----------------------|-------------|-------------|---------------|--------------|
-| Async model          | asyncio     | Promise     | synchronous   | blocking     |
-| Concurrency          | single-thread + event loop | single-thread + event loop | single-thread | daemon thread |
-| Threading            | not needed  | not needed  | NOT thread-safe | one reader thread |
-| Memory management    | GC          | GC          | manual (bc_free) | GC          |
-| Context manager      | async with  | N/A (manual close) | N/A        | try-with-resources |
-| Callback model       | on/off (sync or async) | EventEmitter-style on/off | function pointers + userdata | Consumer/BiConsumer |
-| Server-push polling  | automatic (reader task) | automatic (reader loop) | manual bc_poll() | automatic (reader thread) |
-| Type system          | dataclasses | interfaces  | structs       | POJOs        |
-| Error model          | exceptions  | exceptions  | error codes   | checked exceptions |
-| Platform support     | Linux, macOS, Cygwin, Windows | Linux, macOS, Cygwin | Linux, macOS, Cygwin | Linux, macOS |
-| Named Pipe support   | yes         | yes         | yes           | yes          |
+| Feature              | Python      | TypeScript  | C             | Java         | Go              | C#              |
+|----------------------|-------------|-------------|---------------|--------------|-----------------|-----------------|
+| Async model          | asyncio     | Promise     | synchronous   | blocking     | goroutines      | Task/async-await|
+| Concurrency          | single-thread + event loop | single-thread + event loop | single-thread | daemon thread | goroutines + channels | thread pool + tasks |
+| Threading            | not needed  | not needed  | NOT thread-safe | one reader thread | goroutine-safe | task-safe       |
+| Memory management    | GC          | GC          | manual (bc_free) | GC          | GC              | GC              |
+| Context manager      | async with  | N/A (manual close) | N/A        | try-with-resources | defer Close() | await using     |
+| Callback model       | on/off (sync or async) | EventEmitter-style on/off | function pointers + userdata | Consumer/BiConsumer | function values | C# events       |
+| Server-push polling  | automatic (reader task) | automatic (reader loop) | manual bc_poll() | automatic (reader thread) | automatic (reader goroutine) | automatic (reader task) |
+| Type system          | dataclasses | interfaces  | structs       | POJOs        | structs + tags  | records/classes |
+| Error model          | exceptions  | exceptions  | error codes   | checked exceptions | error interface | exceptions      |
+| Timeout control      | asyncio.wait_for | per-call ms | N/A          | hardcoded 30s | context.Context | CancellationToken |
+| Platform support     | Linux, macOS, Cygwin, Windows | Linux, macOS, Cygwin | Linux, macOS, Cygwin | Linux, macOS | Linux, macOS, Cygwin, Windows | Linux, macOS, Windows, Cygwin |
+| Named Pipe support   | yes         | yes         | yes           | yes          | yes             | yes             |
 
 # Transport modes
 
-All four bindings support the same four transport modes:
+All six bindings support the same four transport modes:
 
 **Unix domain socket** -- The default and recommended transport for
 production use.  Connects to `AF_UNIX` socket at a path discovered
@@ -208,19 +233,22 @@ server-push messages dispatched to registered callbacks.
 All bindings implement the same five error categories, mapped to
 language-appropriate constructs:
 
-| Error category | Python         | TypeScript     | C               | Java                    |
-|----------------|----------------|----------------|-----------------|-------------------------|
-| Base           | BashClientError| BashClientError| (return codes)  | BashClientException     |
-| Authentication | AuthError      | AuthError      | BC_ERR_AUTH     | AuthException           |
-| Protocol       | ProtocolError  | ProtocolError  | BC_ERR_PROTOCOL | ProtocolException       |
-| Timeout        | TimeoutError   | TimeoutError   | BC_ERR_TIMEOUT  | TimeoutException        |
-| Transport      | TransportError | TransportError | BC_ERR_TRANSPORT| TransportException      |
-| Server         | ServerError    | ServerError    | BC_ERR_SERVER   | ServerException         |
+| Error category | Python         | TypeScript     | C               | Java                    | Go                | C#                  |
+|----------------|----------------|----------------|-----------------|-------------------------|-------------------|---------------------|
+| Base           | BashClientError| BashClientError| (return codes)  | BashClientException     | BashClientError   | BashClientException |
+| Authentication | AuthError      | AuthError      | BC_ERR_AUTH     | AuthException           | *AuthError        | AuthException       |
+| Protocol       | ProtocolError  | ProtocolError  | BC_ERR_PROTOCOL | ProtocolException       | *ProtocolError    | ProtocolException   |
+| Timeout        | TimeoutError   | TimeoutError   | BC_ERR_TIMEOUT  | TimeoutException        | *TimeoutError     | TimeoutException    |
+| Transport      | TransportError | TransportError | BC_ERR_TRANSPORT| TransportException      | *TransportError   | TransportException  |
+| Server         | ServerError    | ServerError    | BC_ERR_SERVER   | ServerException         | *ServerError      | ServerException     |
 
 The Python and TypeScript bindings use exception inheritance trees
 rooted at `BashClientError`.  The C binding uses integer return codes
 (`BC_OK`, `BC_ERR_*`).  The Java binding uses checked exceptions as
-static inner classes of `BashClientException`.
+static inner classes of `BashClientException`.  The Go binding uses
+concrete error types implementing the `error` interface, checked via
+`errors.As()`.  The C# binding uses an exception hierarchy rooted at
+`BashClientException`.
 
 # Installation
 
@@ -255,6 +283,20 @@ cd clients/java
 mvn package
 ```
 
+**Go:**
+
+```sh
+cd clients/go
+go build ./...
+```
+
+**C#:**
+
+```sh
+cd clients/csharp
+dotnet build
+```
+
 # Wire protocol
 
 All bindings use the v2 NDJSON wire format exclusively.  Each message
@@ -269,9 +311,9 @@ as NDJSON framing.
 
 # Background reader
 
-Three of the four bindings (Python, TypeScript, Java) run a background
-reader that continuously reads lines from the transport and dispatches
-them:
+Five of the six bindings (Python, TypeScript, Java, Go, C#) run a
+background reader that continuously reads lines from the transport
+and dispatches them:
 
 - **Request/response messages** are placed on per-channel queues.
   The calling method awaits/polls the queue for its response.
@@ -287,17 +329,19 @@ including both queued responses and callback dispatch.
 
 Each binding follows the naming conventions of its host language:
 
-| Concept          | Python           | TypeScript       | C                   | Java             |
-|------------------|------------------|------------------|---------------------|------------------|
-| Connect          | `connect()`      | `connect()`      | `bc_connect()`      | `connect()`      |
-| Authenticate     | `auth()`         | `auth()`         | `bc_auth()`         | `auth()`         |
-| Evaluate         | `eval()`         | `eval()`         | `bc_eval()`         | `eval()`         |
-| Get variable     | `state.get_var()`| `state.getVar()` | `bc_state_get_var()`| `state.getVar()` |
-| Set breakpoint   | `debug.add_breakpoint()` | `debug.addBreakpoint()` | `bc_debug_add_breakpoint()` | `debug.addBreakpoint()` |
-| Spawn PTY        | `pty.spawn()`    | `pty.spawn()`    | `bc_pty_spawn()`    | `pty.spawn()`    |
+| Concept          | Python           | TypeScript       | C                   | Java             | Go                  | C#                    |
+|------------------|------------------|------------------|---------------------|------------------|---------------------|-----------------------|
+| Connect          | `connect()`      | `connect()`      | `bc_connect()`      | `connect()`      | `Connect()`         | `ConnectAsync()`      |
+| Authenticate     | `auth()`         | `auth()`         | `bc_auth()`         | `auth()`         | `Auth()`            | `AuthAsync()`         |
+| Evaluate         | `eval()`         | `eval()`         | `bc_eval()`         | `eval()`         | `Eval()`            | `EvalAsync()`         |
+| Get variable     | `state.get_var()`| `state.getVar()` | `bc_state_get_var()`| `state.getVar()` | `State.GetVar()`    | `State.GetVarAsync()` |
+| Set breakpoint   | `debug.add_breakpoint()` | `debug.addBreakpoint()` | `bc_debug_add_breakpoint()` | `debug.addBreakpoint()` | `Debug.AddBreakpoint()` | `Debug.AddBreakpointAsync()` |
+| Spawn PTY        | `pty.spawn()`    | `pty.spawn()`    | `bc_pty_spawn()`    | `pty.spawn()`    | `Pty.Spawn()`       | `Pty.SpawnAsync()`    |
 
-Python uses `snake_case`, TypeScript and Java use `camelCase`, and the
-C binding prefixes all functions with `bc_` and uses `snake_case`.
+Python uses `snake_case`, TypeScript and Java use `camelCase`, the
+C binding prefixes all functions with `bc_` and uses `snake_case`,
+Go uses exported `PascalCase`, and C# uses `PascalCase` with an
+`Async` suffix on async methods.
 
 # SEE ALSO
 
@@ -305,6 +349,8 @@ C binding prefixes all functions with `bc_` and uses `snake_case`.
 **bash-server-client-typescript**(7),
 **bash-server-client-c**(7),
 **bash-server-client-java**(7),
+**bash-server-client-go**(7),
+**bash-server-client-csharp**(7),
 **bash-server-client-transports**(7),
 **bash-server-client-channels**(7),
 **bash-server**(1),
