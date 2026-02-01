@@ -27,7 +27,7 @@ TESTS = test_protocol$(EXEEXT) test_socket$(EXEEXT) test_config$(EXEEXT) \
 
 # Test utilities (not run directly by 'check', used by integration tests)
 UTILS = test_client$(EXEEXT) test_session$(EXEEXT) test_winpipe$(EXEEXT) \
-	test_state$(EXEEXT)
+	test_state$(EXEEXT) test_transport$(EXEEXT)
 
 # Server source files needed by tests
 SERVER_PROTOCOL = $(serverdir)/server_protocol.c
@@ -81,6 +81,9 @@ test_winpipe$(EXEEXT): test_winpipe.c $(SERVER_PROTOCOL) $(SERVER_WINPIPE) $(ser
 
 test_state$(EXEEXT): test_state.c $(SERVER_PROTOCOL) $(serverdir)/server.h
 	$(CC) $(CFLAGS) -o $@ test_state.c $(SERVER_PROTOCOL)
+
+test_transport$(EXEEXT): test_transport.c
+	$(CC) $(CFLAGS) -o $@ test_transport.c
 
 test_json$(EXEEXT): test_json.c $(SERVER_JSON) $(SERVER_PROTOCOL) $(serverdir)/server.h
 	$(CC) $(CFLAGS) -o $@ test_json.c $(SERVER_JSON) $(SERVER_PROTOCOL)

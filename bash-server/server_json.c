@@ -293,12 +293,23 @@ json_get_string_array(const char *json, const char *key,
  * Frame I/O
  * ================================================================ */
 
-/* Read exactly n bytes from fd.  Returns 0 on success, -1 on error/EOF. */
+/* Read exactly n bytes from fd.  Returns 0 on success, -1 on error/EOF.
+   First byte may come from pushback (protocol detection on pipes). */
 static int
 read_exact(int fd, void *buf, size_t n)
 {
     size_t total = 0;
     ssize_t r;
+
+    /* First byte: check pushback (may have been saved by protocol detection) */
+    if (n > 0) {
+        char pb;
+        r = protocol_pushback_get(fd, &pb);
+        if (r <= 0)
+            return -1;
+        ((char *)buf)[0] = pb;
+        total = 1;
+    }
 
     while (total < n) {
         r = read(fd, (char *)buf + total, n - total);
@@ -418,21 +429,17 @@ ndjson_frame_read(int fd, int *channel, int *flags, char **payload, size_t *payl
 
     *flags = 0;  /* NDJSON has no flags */
 
-    /* Read one byte at a time until \n (simple, correct for line protocol) */
+    /* Read one byte at a time until \n (simple, correct for line protocol).
+       First byte may come from pushback (protocol detection on pipes). */
     cap = 1024;
     buf = malloc(cap);
     if (!buf)
         return -1;
 
     while (1) {
-        n = read(fd, &byte, 1);
-        if (n < 0) {
-            if (errno == EINTR) continue;
-            free(buf);
-            return -1;
-        }
-        if (n == 0) {
-            /* EOF */
+        n = protocol_pushback_get(fd, &byte);
+        if (n <= 0) {
+            /* EOF or error */
             free(buf);
             return -1;
         }
@@ -624,9 +631,21 @@ protocol_detect_version(int fd, char *first_byte)
     unsigned char byte;
     ssize_t n;
 
+    /* Try non-destructive peek first (works on sockets) */
     n = recv(fd, &byte, 1, MSG_PEEK);
-    if (n <= 0)
-        return -1;
+    if (n <= 0) {
+        /* recv(MSG_PEEK) fails on pipes with ENOTSOCK/EOPNOTSUPP.
+           Fall back to destructive read + pushback. */
+        if (errno == ENOTSOCK || errno == EOPNOTSUPP || errno == EBADF) {
+            n = read(fd, &byte, 1);
+            if (n <= 0)
+                return -1;
+            /* Save the consumed byte so the next reader gets it back */
+            protocol_pushback_set((char)byte);
+        } else {
+            return -1;
+        }
+    }
 
     *first_byte = (char)byte;
 

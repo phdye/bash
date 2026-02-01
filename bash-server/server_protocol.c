@@ -22,6 +22,40 @@
 #include <stdarg.h>
 #include <ctype.h>
 
+/* ================================================================
+ * Pushback byte — process-global, safe because fork-per-session.
+ *
+ * protocol_detect_version() uses recv(MSG_PEEK) on sockets, but on
+ * pipes (stdio mode) recv fails with ENOTSOCK.  The fallback reads
+ * the first byte destructively, then pushes it back here so that
+ * subsequent byte-level readers see it as the first byte.
+ * ================================================================ */
+
+static char  s_pushback_byte;
+static int   s_has_pushback = 0;
+
+void
+protocol_pushback_set(char byte)
+{
+    s_pushback_byte = byte;
+    s_has_pushback = 1;
+}
+
+/* Return the pushback byte if available, otherwise read one byte from fd.
+   Returns 1 on success, 0 on EOF, -1 on error — same semantics as read(). */
+int
+protocol_pushback_get(int fd, char *byte)
+{
+    if (s_has_pushback) {
+        *byte = s_pushback_byte;
+        s_has_pushback = 0;
+        return 1;
+    }
+    ssize_t n;
+    do { n = read(fd, byte, 1); } while (n < 0 && errno == EINTR);
+    return (int)n;
+}
+
 /* Base64 encoding table */
 static const char base64_table[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -47,23 +81,20 @@ init_base64_decode_table(void)
     base64_table_initialized = 1;
 }
 
-/* Read a line from socket (up to newline or buffer limit) */
+/* Read a line from socket/pipe (up to newline or buffer limit).
+   Uses protocol_pushback_get for the first byte to support pipe-based
+   protocol detection (where recv MSG_PEEK is unavailable). */
 int
 protocol_read_line(int fd, char *buf, size_t bufsize)
 {
     size_t pos = 0;
-    ssize_t n;
+    int n;
     char c;
-    
+
     while (pos < bufsize - 1) {
-        n = read(fd, &c, 1);
-        if (n < 0) {
-            if (errno == EINTR)
-                continue;
-            return -1;
-        }
-        if (n == 0) {
-            /* EOF */
+        n = protocol_pushback_get(fd, &c);
+        if (n <= 0) {
+            /* EOF or error */
             if (pos == 0)
                 return -1;
             break;
@@ -83,30 +114,53 @@ protocol_read_line(int fd, char *buf, size_t bufsize)
     return (int)pos;
 }
 
-/* Write a formatted line to socket */
+/* Write a formatted line to socket.
+   Uses a stack buffer for small lines and dynamically allocates for large
+   ones (e.g. base64-encoded STDOUT/STDERR payloads up to ~1.4MB). */
 int
 protocol_write_line(int fd, const char *fmt, ...)
 {
-    char buf[SERVER_MAX_LINE];
-    va_list ap;
+    char smallbuf[SERVER_MAX_LINE];
+    char *buf = smallbuf;
+    size_t bufsize = sizeof(smallbuf);
+    va_list ap, ap2;
     int len;
     ssize_t written, total;
-    
+    int need_free = 0;
+
+    /* First pass: try stack buffer */
     va_start(ap, fmt);
-    len = vsnprintf(buf, sizeof(buf) - 2, fmt, ap);
+    va_copy(ap2, ap);
+    len = vsnprintf(buf, bufsize - 2, fmt, ap);
     va_end(ap);
-    
-    if (len < 0)
+
+    if (len < 0) {
+        va_end(ap2);
         return -1;
-    
-    /* Ensure we have room for newline */
-    if (len >= (int)sizeof(buf) - 2)
-        len = sizeof(buf) - 3;
-    
+    }
+
+    /* If the formatted string was truncated, allocate a dynamic buffer */
+    if (len >= (int)bufsize - 2) {
+        bufsize = (size_t)len + 4;  /* +2 for \n\0, +2 margin */
+        buf = malloc(bufsize);
+        if (!buf) {
+            va_end(ap2);
+            return -1;
+        }
+        need_free = 1;
+        len = vsnprintf(buf, bufsize - 2, fmt, ap2);
+        if (len < 0) {
+            free(buf);
+            va_end(ap2);
+            return -1;
+        }
+    }
+    va_end(ap2);
+
     /* Add newline */
     buf[len++] = '\n';
     buf[len] = '\0';
-    
+
     /* Write all data */
     total = 0;
     while (total < len) {
@@ -114,11 +168,13 @@ protocol_write_line(int fd, const char *fmt, ...)
         if (written < 0) {
             if (errno == EINTR)
                 continue;
+            if (need_free) free(buf);
             return -1;
         }
         total += written;
     }
-    
+
+    if (need_free) free(buf);
     return (int)total;
 }
 

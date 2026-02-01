@@ -209,6 +209,12 @@ int  json_get_wire_format(void);
 /* Protocol version detection */
 int  protocol_detect_version(int fd, char *first_byte);
 
+/* Pushback byte for pipe-based protocol detection.
+   recv(MSG_PEEK) fails on pipes (ENOTSOCK), so detection falls back to
+   read() which consumes the byte.  These functions save/restore it. */
+void protocol_pushback_set(char byte);
+int  protocol_pushback_get(int fd, char *byte);
+
 /* Function declarations - server_pty.c (PTY/interactive mode) */
 int  pty_handle_spawn(int client_rfd, int client_wfd, const char *payload);
 int  pty_parse_signal(const char *name);

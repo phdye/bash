@@ -737,6 +737,132 @@ test_protocol_detect_three_way(void)
 }
 
 
+/* ================================================================
+ * Test: protocol_detect_version works on pipe fds (not just sockets)
+ *
+ * This is the core regression test for the stdio transport bug:
+ * recv(MSG_PEEK) returns ENOTSOCK on pipes, so protocol detection
+ * must fall back to read() + pushback.
+ * ================================================================ */
+static void
+test_detect_version_on_pipe(void)
+{
+    int pipefd[2];
+    char first_byte;
+    int version;
+
+    printf("test_detect_version_on_pipe:\n");
+
+    /* Test NDJSON detection on pipe (the broken case) */
+    ASSERT(pipe(pipefd) == 0, "pipe creation");
+    {
+        const char *msg = "{\"ch\":0,\"type\":\"auth\"}\n";
+        write(pipefd[1], msg, strlen(msg));
+    }
+
+    version = protocol_detect_version(pipefd[0], &first_byte);
+    ASSERT(version == PROTOCOL_V2_NDJSON, "detected NDJSON on pipe fd");
+    ASSERT(first_byte == '{', "first byte is '{'");
+
+    /* The pushback byte must allow reading the full line correctly.
+       protocol_read_line should return the complete line starting with '{'. */
+    {
+        char buf[256];
+        int n = protocol_read_line(pipefd[0], buf, sizeof(buf));
+        ASSERT(n > 0, "protocol_read_line succeeds after pipe detect");
+        ASSERT(buf[0] == '{', "pushback byte '{' restored as first char");
+        ASSERT(strstr(buf, "\"ch\":0") != NULL, "full NDJSON line readable");
+    }
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    /* Test v1 detection on pipe */
+    ASSERT(pipe(pipefd) == 0, "pipe creation for v1");
+    write(pipefd[1], "AUTH token123\n", 14);
+
+    version = protocol_detect_version(pipefd[0], &first_byte);
+    ASSERT(version == PROTOCOL_V1, "detected v1 on pipe fd");
+    ASSERT(first_byte == 'A', "first byte is 'A'");
+
+    /* Pushback should restore 'A' for the v1 line reader */
+    {
+        char buf[256];
+        int n = protocol_read_line(pipefd[0], buf, sizeof(buf));
+        ASSERT(n > 0, "protocol_read_line succeeds after v1 pipe detect");
+        ASSERT(strncmp(buf, "AUTH", 4) == 0, "v1 line starts with AUTH");
+    }
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    /* Test binary v2 detection on pipe */
+    ASSERT(pipe(pipefd) == 0, "pipe creation for v2 binary");
+    {
+        unsigned char data[7] = { CHAN_CONTROL, 0, 0, 0, 0, 1, 'X' };
+        write(pipefd[1], data, sizeof(data));
+    }
+
+    version = protocol_detect_version(pipefd[0], &first_byte);
+    ASSERT(version == PROTOCOL_V2, "detected v2 binary on pipe fd");
+    ASSERT((unsigned char)first_byte == CHAN_CONTROL, "first byte is channel 0");
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+}
+
+
+/* ================================================================
+ * Test: NDJSON frame read works after pipe-based detection
+ *
+ * Simulates the full data path: detect version on pipe, then read
+ * a complete NDJSON frame. The pushback byte from detection must
+ * be consumed by the first ndjson_frame_read call.
+ * ================================================================ */
+static void
+test_ndjson_read_after_pipe_detect(void)
+{
+    int pipefd[2];
+    char first_byte;
+    int version;
+    int channel, flags;
+    char *payload;
+    size_t payload_len;
+
+    printf("test_ndjson_read_after_pipe_detect:\n");
+
+    ASSERT(pipe(pipefd) == 0, "pipe creation");
+
+    /* Write a complete NDJSON auth message */
+    {
+        const char *msg = "{\"ch\":0,\"type\":\"auth\",\"token\":\"abc\"}\n";
+        write(pipefd[1], msg, strlen(msg));
+    }
+    close(pipefd[1]);
+
+    /* Detect version (consumes first byte via read, pushes it back) */
+    version = protocol_detect_version(pipefd[0], &first_byte);
+    ASSERT(version == PROTOCOL_V2_NDJSON, "detected NDJSON");
+
+    /* Switch to NDJSON wire format as session_handle would */
+    json_set_wire_format(WIRE_NDJSON);
+
+    /* Read the full frame — pushback byte must be restored */
+    ASSERT(json_frame_read(pipefd[0], &channel, &flags, &payload, &payload_len) == 0,
+        "ndjson frame read after pipe detect");
+    ASSERT(channel == CHAN_CONTROL, "channel is CONTROL");
+    ASSERT(payload != NULL, "payload not NULL");
+    ASSERT(strstr(payload, "\"type\":\"auth\"") != NULL, "payload has auth type");
+    ASSERT(strstr(payload, "\"token\":\"abc\"") != NULL, "payload has token");
+
+    free(payload);
+    close(pipefd[0]);
+
+    /* Restore binary mode */
+    json_set_wire_format(WIRE_BINARY);
+}
+
+
 int
 main(void)
 {
@@ -769,6 +895,10 @@ main(void)
     test_ndjson_binary_mode_unchanged();
     test_protocol_detect_ndjson();
     test_protocol_detect_three_way();
+
+    /* Pipe transport detection tests */
+    test_detect_version_on_pipe();
+    test_ndjson_read_after_pipe_detect();
 
     printf("\n=== Results: %d/%d passed ===\n", tests_passed, tests_run);
 
