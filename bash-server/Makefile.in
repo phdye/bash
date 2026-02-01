@@ -29,6 +29,8 @@ OBJEXT = @OBJEXT@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 bindir = @bindir@
+datarootdir = @datarootdir@
+docdir = @docdir@
 
 srcdir = @srcdir@
 VPATH = @srcdir@
@@ -39,6 +41,7 @@ DESTDIR =
 
 INSTALL = @INSTALL@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
+INSTALL_DATA = @INSTALL_DATA@
 
 PROFILE_FLAGS = @PROFILE_FLAGS@
 CFLAGS = @CFLAGS@
@@ -70,11 +73,13 @@ CCFLAGS = $(BASE_CCFLAGS) $(CPPFLAGS) $(CFLAGS)
 Program = bash-server$(EXEEXT)
 
 # Source files
-SOURCES = server_main.c server_socket.c server_session.c server_protocol.c
+SOURCES = server_main.c server_socket.c server_session.c server_protocol.c \
+	server_winpipe.c
 
 # Object files
 OBJECTS = server_main.$(OBJEXT) server_socket.$(OBJEXT) \
-	server_session.$(OBJEXT) server_protocol.$(OBJEXT)
+	server_session.$(OBJEXT) server_protocol.$(OBJEXT) \
+	server_winpipe.$(OBJEXT)
 
 # On Cygwin, all bash internals are in cygbash-X.Y.dll.
 # bash-server links against the DLL import library (libcygbash.dll.a)
@@ -90,11 +95,41 @@ $(Program): $(OBJECTS) $(BASH_DLL)
 	$(RM) $@
 	$(CC) $(LDFLAGS) $(LOCAL_LDFLAGS) -o $@ $(OBJECTS) -L$(BUILD_DIR) -lcygbash $(LIBS)
 
-install: $(Program)
+# AI documentation files
+AI_DOC_DIR = $(topdir)/doc/server/ai
+AI_DOCS = $(AI_DOC_DIR)/protocol.md $(AI_DOC_DIR)/api-reference.md \
+	$(AI_DOC_DIR)/errors.md $(AI_DOC_DIR)/integration.md
+AI_ALL = $(AI_DOC_DIR)/all.md
+
+install: $(Program) install-ai-docs
+
+install-program: $(Program)
 	$(INSTALL_PROGRAM) $(Program) $(DESTDIR)$(bindir)/$(Program)
+
+install-ai-docs: $(AI_ALL)
+	$(INSTALL) -d $(DESTDIR)$(docdir)/ai
+	@for f in $(AI_DOCS) $(AI_ALL); do \
+		$(INSTALL_DATA) $$f $(DESTDIR)$(docdir)/ai/ ; \
+	done
 
 uninstall:
 	$(RM) $(DESTDIR)$(bindir)/$(Program)
+	$(RM) -r $(DESTDIR)$(docdir)/ai
+
+# Generate concatenated AI doc (analogous to llms-full.txt)
+$(AI_ALL): $(AI_DOCS)
+	@echo "Generating $@"
+	@{ echo "# bash-server — Complete AI Reference"; \
+	   echo ""; \
+	   echo "> This file concatenates all AI-focused reference documentation"; \
+	   echo "> for the bash-server v1/v2 protocol. Individual files:"; \
+	   echo "> protocol.md, api-reference.md, errors.md, integration.md"; \
+	   echo ""; \
+	   for f in $(AI_DOCS); do \
+	       echo "---"; echo ""; \
+	       cat $$f; echo ""; \
+	   done; \
+	} > $@
 
 clean:
 	$(RM) $(Program) $(OBJECTS)
@@ -105,6 +140,7 @@ distclean: clean
 mostlyclean: clean
 
 maintainer-clean: distclean
+	$(RM) $(AI_ALL)
 
 # Dependencies
 server_main.$(OBJEXT): server_main.c server.h $(topdir)/config.h
@@ -112,5 +148,6 @@ server_socket.$(OBJEXT): server_socket.c server.h $(topdir)/config.h
 server_session.$(OBJEXT): server_session.c server.h $(topdir)/config.h \
 	$(topdir)/shell.h $(topdir)/builtins/common.h
 server_protocol.$(OBJEXT): server_protocol.c server.h $(topdir)/config.h
+server_winpipe.$(OBJEXT): server_winpipe.c server.h $(topdir)/config.h
 
-.PHONY: all install uninstall clean distclean mostlyclean maintainer-clean
+.PHONY: all install install-program install-ai-docs uninstall clean distclean mostlyclean maintainer-clean
