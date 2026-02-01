@@ -18,8 +18,8 @@ public class StateChannel
 
     private async Task<Msg> RequestAsync(Dictionary<string, object?> msg, CancellationToken ct)
     {
-        await _send(msg);
-        var resp = await _recv(Ch.State, ct);
+        await _send(msg).ConfigureAwait(false);
+        var resp = await _recv(Ch.State, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "state error"), Ch.State);
@@ -31,7 +31,7 @@ public class StateChannel
     public async Task<VarInfo> GetVarAsync(string name, CancellationToken ct = default)
     {
         var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "get",
-            new() { ["target"] = "var", ["name"] = name }), ct);
+            new() { ["target"] = "var", ["name"] = name }), ct).ConfigureAwait(false);
         return new VarInfo(
             NdjsonProtocol.GetString(resp, "name", name),
             NdjsonProtocol.GetString(resp, "value"),
@@ -47,13 +47,13 @@ public class StateChannel
         };
         if (attributes != null && attributes.Length > 0)
             extra["attributes"] = attributes;
-        await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "set", extra), ct);
+        await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "set", extra), ct).ConfigureAwait(false);
     }
 
     public async Task UnsetVarAsync(string name, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "unset",
-            new() { ["target"] = "var", ["name"] = name }), ct);
+            new() { ["target"] = "var", ["name"] = name }), ct).ConfigureAwait(false);
     }
 
     // --- Functions ---
@@ -61,7 +61,7 @@ public class StateChannel
     public async Task<FuncInfo> GetFuncAsync(string name, CancellationToken ct = default)
     {
         var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "get",
-            new() { ["target"] = "function", ["name"] = name }), ct);
+            new() { ["target"] = "function", ["name"] = name }), ct).ConfigureAwait(false);
         return new FuncInfo(
             NdjsonProtocol.GetString(resp, "name", name),
             NdjsonProtocol.GetString(resp, "definition"));
@@ -70,7 +70,7 @@ public class StateChannel
     public async Task UnsetFuncAsync(string name, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "unset",
-            new() { ["target"] = "function", ["name"] = name }), ct);
+            new() { ["target"] = "function", ["name"] = name }), ct).ConfigureAwait(false);
     }
 
     // --- Aliases ---
@@ -78,7 +78,7 @@ public class StateChannel
     public async Task<AliasInfo> GetAliasAsync(string name, CancellationToken ct = default)
     {
         var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "get",
-            new() { ["target"] = "alias", ["name"] = name }), ct);
+            new() { ["target"] = "alias", ["name"] = name }), ct).ConfigureAwait(false);
         return new AliasInfo(
             NdjsonProtocol.GetString(resp, "name", name),
             NdjsonProtocol.GetString(resp, "value"));
@@ -87,13 +87,13 @@ public class StateChannel
     public async Task SetAliasAsync(string name, string value, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "set",
-            new() { ["target"] = "alias", ["name"] = name, ["value"] = value }), ct);
+            new() { ["target"] = "alias", ["name"] = name, ["value"] = value }), ct).ConfigureAwait(false);
     }
 
     public async Task UnsetAliasAsync(string name, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "unset",
-            new() { ["target"] = "alias", ["name"] = name }), ct);
+            new() { ["target"] = "alias", ["name"] = name }), ct).ConfigureAwait(false);
     }
 
     // --- Traps ---
@@ -101,13 +101,13 @@ public class StateChannel
     public async Task SetTrapAsync(string signal, string command, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "set",
-            new() { ["target"] = "trap", ["name"] = signal, ["value"] = command }), ct);
+            new() { ["target"] = "trap", ["name"] = signal, ["value"] = command }), ct).ConfigureAwait(false);
     }
 
     public async Task UnsetTrapAsync(string signal, CancellationToken ct = default)
     {
         await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "unset",
-            new() { ["target"] = "trap", ["name"] = signal }), ct);
+            new() { ["target"] = "trap", ["name"] = signal }), ct).ConfigureAwait(false);
     }
 
     // --- Inspect ---
@@ -115,7 +115,7 @@ public class StateChannel
     public async Task<List<Msg>> InspectAsync(string query, CancellationToken ct = default)
     {
         var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.State, "inspect",
-            new() { ["query"] = query }), ct);
+            new() { ["query"] = query }), ct).ConfigureAwait(false);
         return NdjsonProtocol.GetObjectArray(resp, "data");
     }
 }

@@ -26,8 +26,8 @@ public class ObserveChannel
     public async Task SubscribeAsync(int level = 1, CancellationToken ct = default)
     {
         await _send(NdjsonProtocol.MakeMsg(Ch.Observe, "subscribe",
-            new() { ["level"] = level }));
-        var resp = await _recv(Ch.Observe, ct);
+            new() { ["level"] = level })).ConfigureAwait(false);
+        var resp = await _recv(Ch.Observe, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "subscribe error"), Ch.Observe);
@@ -35,8 +35,8 @@ public class ObserveChannel
 
     public async Task UnsubscribeAsync(CancellationToken ct = default)
     {
-        await _send(NdjsonProtocol.MakeMsg(Ch.Observe, "unsubscribe"));
-        var resp = await _recv(Ch.Observe, ct);
+        await _send(NdjsonProtocol.MakeMsg(Ch.Observe, "unsubscribe")).ConfigureAwait(false);
+        var resp = await _recv(Ch.Observe, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "unsubscribe error"), Ch.Observe);

@@ -28,7 +28,7 @@ public class NamedPipeTransport : ITransport
 
             _pipe = new NamedPipeClientStream(serverName, name,
                 PipeDirection.InOut, PipeOptions.Asynchronous);
-            await _pipe.ConnectAsync(ct);
+            await _pipe.ConnectAsync(ct).ConfigureAwait(false);
             _reader = new StreamReader(_pipe);
             _open = true;
         }
@@ -43,7 +43,7 @@ public class NamedPipeTransport : ITransport
         if (_reader == null) throw new TransportException("not connected");
         try
         {
-            var line = await _reader.ReadLineAsync();
+            var line = await _reader.ReadLineAsync().ConfigureAwait(false);
             if (line == null)
             {
                 _open = false;
@@ -63,8 +63,8 @@ public class NamedPipeTransport : ITransport
         if (_pipe == null) throw new TransportException("not connected");
         try
         {
-            await _pipe.WriteAsync(data, ct);
-            await _pipe.FlushAsync(ct);
+            await _pipe.WriteAsync(data, ct).ConfigureAwait(false);
+            await _pipe.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException)
         {
@@ -77,7 +77,7 @@ public class NamedPipeTransport : ITransport
     {
         _open = false;
         _reader?.Dispose();
-        if (_pipe != null) await _pipe.DisposeAsync();
+        if (_pipe != null) await _pipe.DisposeAsync().ConfigureAwait(false);
     }
 
     public bool IsOpen => _open;

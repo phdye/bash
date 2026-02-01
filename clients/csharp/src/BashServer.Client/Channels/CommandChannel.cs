@@ -19,14 +19,14 @@ public class CommandChannel
     public async Task<EvalResult> EvalAsync(string command, CancellationToken ct = default)
     {
         await _send(NdjsonProtocol.MakeMsg(Ch.Command, "eval",
-            new() { ["command"] = command }));
+            new() { ["command"] = command })).ConfigureAwait(false);
 
         string stdout = "", stderr = "";
         int exitCode = -1;
 
         for (int i = 0; i < 3; i++)
         {
-            var resp = await _recv(Ch.Command, ct);
+            var resp = await _recv(Ch.Command, ct).ConfigureAwait(false);
             var t = NdjsonProtocol.GetType(resp);
             switch (t)
             {

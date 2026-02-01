@@ -15,7 +15,7 @@ public class UnixSocketTransport : ITransport
         try
         {
             _socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-            await _socket.ConnectAsync(new UnixDomainSocketEndPoint(path), ct);
+            await _socket.ConnectAsync(new UnixDomainSocketEndPoint(path), ct).ConfigureAwait(false);
             _stream = new NetworkStream(_socket, ownsSocket: true);
             _reader = new StreamReader(_stream);
             _open = true;
@@ -31,7 +31,7 @@ public class UnixSocketTransport : ITransport
         if (_reader == null) throw new TransportException("not connected");
         try
         {
-            var line = await _reader.ReadLineAsync();
+            var line = await _reader.ReadLineAsync().ConfigureAwait(false);
             if (line == null)
             {
                 _open = false;
@@ -51,8 +51,8 @@ public class UnixSocketTransport : ITransport
         if (_stream == null) throw new TransportException("not connected");
         try
         {
-            await _stream.WriteAsync(data, ct);
-            await _stream.FlushAsync(ct);
+            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+            await _stream.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or SocketException)
         {
@@ -65,7 +65,7 @@ public class UnixSocketTransport : ITransport
     {
         _open = false;
         _reader?.Dispose();
-        if (_stream != null) await _stream.DisposeAsync();
+        if (_stream != null) await _stream.DisposeAsync().ConfigureAwait(false);
         _socket?.Dispose();
     }
 

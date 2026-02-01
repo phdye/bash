@@ -57,40 +57,40 @@ public sealed class BashClient : IAsyncDisposable
     }
 
     /// <summary>Connect via Unix domain socket.</summary>
-    public static async Task<BashClient> ConnectAsync(string socketPath)
+    public static async Task<BashClient> ConnectAsync(string socketPath, CancellationToken ct = default)
     {
         var transport = new UnixSocketTransport();
-        await transport.ConnectAsync(socketPath);
+        await transport.ConnectAsync(socketPath, ct).ConfigureAwait(false);
         var client = new BashClient(transport);
         client.StartReader();
         return client;
     }
 
     /// <summary>Connect via subprocess stdin/stdout (--stdio mode).</summary>
-    public static async Task<BashClient> ConnectStdioAsync(params string[] args)
+    public static async Task<BashClient> ConnectStdioAsync(string[] args, CancellationToken ct = default)
     {
         var transport = new StdioTransport();
-        await transport.ConnectProcessAsync(args);
+        await transport.ConnectProcessAsync(args).ConfigureAwait(false);
         var client = new BashClient(transport);
         client.StartReader();
         return client;
     }
 
     /// <summary>Connect via inherited file descriptor.</summary>
-    public static async Task<BashClient> ConnectFdAsync(int fd)
+    public static async Task<BashClient> ConnectFdAsync(int fd, CancellationToken ct = default)
     {
         var transport = new FdTransport();
-        await transport.ConnectAsync(fd);
+        await transport.ConnectAsync(fd).ConfigureAwait(false);
         var client = new BashClient(transport);
         client.StartReader();
         return client;
     }
 
     /// <summary>Connect via Windows Named Pipe.</summary>
-    public static async Task<BashClient> ConnectNamedPipeAsync(string pipeName)
+    public static async Task<BashClient> ConnectNamedPipeAsync(string pipeName, CancellationToken ct = default)
     {
         var transport = new NamedPipeTransport();
-        await transport.ConnectAsync(pipeName);
+        await transport.ConnectAsync(pipeName, ct).ConfigureAwait(false);
         var client = new BashClient(transport);
         client.StartReader();
         return client;
@@ -107,7 +107,7 @@ public sealed class BashClient : IAsyncDisposable
     /// <summary>Authenticate with the server.</summary>
     public async Task AuthAsync(string token, CancellationToken ct = default)
     {
-        await Control.AuthAsync(token, ct);
+        await Control.AuthAsync(token, ct).ConfigureAwait(false);
         _authenticated = true;
     }
 
@@ -124,29 +124,31 @@ public sealed class BashClient : IAsyncDisposable
     {
         if (_disposed) return;
 
-        // Send disconnect while reader is still active
+        // Send disconnect while reader is still active (best-effort).
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            await Control.DisconnectAsync(cts.Token);
+            await Control.DisconnectAsync(cts.Token).ConfigureAwait(false);
         }
-        catch { }
+        catch (Exception) { /* Disconnect is best-effort on close. */ }
 
-        // Cancel the reader
+        // Cancel the reader.
         _readerCts?.Cancel();
         if (_readerTask != null)
         {
-            try { await _readerTask; } catch { }
+            try { await _readerTask.ConfigureAwait(false); }
+            catch (OperationCanceledException) { }
+            catch (TransportException) { }
         }
 
-        await _transport.CloseAsync();
+        await _transport.CloseAsync().ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;
         _disposed = true;
-        await CloseAsync();
+        await CloseAsync().ConfigureAwait(false);
     }
 
     private void StartReader()
@@ -164,11 +166,11 @@ public sealed class BashClient : IAsyncDisposable
                 string line;
                 try
                 {
-                    line = await _transport.ReadLineAsync(ct);
+                    line = await _transport.ReadLineAsync(ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { break; }
                 catch (TransportException) { break; }
-                catch { break; }
+                catch (IOException) { break; }
 
                 Msg msg;
                 try
@@ -201,7 +203,6 @@ public sealed class BashClient : IAsyncDisposable
             }
         }
         catch (OperationCanceledException) { }
-        catch { }
     }
 
     private Task SendAsync(Dictionary<string, object?> msg)
@@ -214,7 +215,7 @@ public sealed class BashClient : IAsyncDisposable
     {
         try
         {
-            return await _channelQueues[channel].DequeueAsync(ct);
+            return await _channelQueues[channel].DequeueAsync(ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

@@ -10,7 +10,7 @@ import (
 func EncodeFrame(msg Message) ([]byte, error) {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return nil, newProtocolError(fmt.Sprintf("cannot encode frame: %v", err))
+		return nil, newProtocolErrorf(err, "cannot encode frame: %v", err)
 	}
 	return append(data, '\n'), nil
 }
@@ -36,7 +36,7 @@ func DecodeFrame(line []byte) (Message, error) {
 
 	var msg Message
 	if err := json.Unmarshal(trimmed, &msg); err != nil {
-		return nil, newProtocolError(fmt.Sprintf("invalid JSON: %v", err))
+		return nil, newProtocolErrorf(err, "invalid JSON: %v", err)
 	}
 	return msg, nil
 }
@@ -50,7 +50,7 @@ func B64Encode(s string) string {
 func B64Decode(s string) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return "", newProtocolError(fmt.Sprintf("base64 decode error: %v", err))
+		return "", newProtocolErrorf(err, "base64 decode error: %v", err)
 	}
 	return string(data), nil
 }

@@ -5,9 +5,13 @@ import "fmt"
 // BashClientError is the base error type for all bashclient errors.
 type BashClientError struct {
 	Message string
+	Cause   error
 }
 
 func (e *BashClientError) Error() string { return e.Message }
+
+// Unwrap returns the underlying cause, supporting errors.Is and errors.As.
+func (e *BashClientError) Unwrap() error { return e.Cause }
 
 // AuthError indicates authentication failure.
 type AuthError struct {
@@ -35,6 +39,7 @@ type ServerError struct {
 	Channel int
 }
 
+// Error returns a formatted error string including the channel number.
 func (e *ServerError) Error() string {
 	return fmt.Sprintf("server error on channel %d: %s", e.Channel, e.Message)
 }
@@ -44,7 +49,11 @@ func newAuthError(msg string) *AuthError {
 }
 
 func newProtocolError(msg string) *ProtocolError {
-	return &ProtocolError{BashClientError{Message: msg}}
+	return &ProtocolError{BashClientError{Message: msg, Cause: nil}}
+}
+
+func newProtocolErrorf(cause error, format string, args ...any) *ProtocolError {
+	return &ProtocolError{BashClientError{Message: fmt.Sprintf(format, args...), Cause: cause}}
 }
 
 func newTimeoutError(msg string) *TimeoutError {
@@ -52,7 +61,11 @@ func newTimeoutError(msg string) *TimeoutError {
 }
 
 func newTransportError(msg string) *TransportError {
-	return &TransportError{BashClientError{Message: msg}}
+	return &TransportError{BashClientError{Message: msg, Cause: nil}}
+}
+
+func newTransportErrorf(cause error, format string, args ...any) *TransportError {
+	return &TransportError{BashClientError{Message: fmt.Sprintf(format, args...), Cause: cause}}
 }
 
 func newServerError(msg string, ch int) *ServerError {

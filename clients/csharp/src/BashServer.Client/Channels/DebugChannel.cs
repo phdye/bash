@@ -22,8 +22,8 @@ public class DebugChannel
 
     private async Task<Msg> RequestAsync(Dictionary<string, object?> msg, CancellationToken ct)
     {
-        await _send(msg);
-        var resp = await _recv(Ch.Debug, ct);
+        await _send(msg).ConfigureAwait(false);
+        var resp = await _recv(Ch.Debug, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "debug error"), Ch.Debug);
@@ -31,14 +31,14 @@ public class DebugChannel
     }
 
     public async Task EnableAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "enable"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "enable"), ct).ConfigureAwait(false);
 
     public async Task DisableAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "disable"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "disable"), ct).ConfigureAwait(false);
 
     public async Task<DebugStatus> StatusAsync(CancellationToken ct = default)
     {
-        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "status"), ct);
+        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "status"), ct).ConfigureAwait(false);
         return new DebugStatus(
             NdjsonProtocol.GetBool(resp, "active"),
             NdjsonProtocol.GetString(resp, "mode", "run"),
@@ -54,25 +54,25 @@ public class DebugChannel
         if (pattern != null) extra["pattern"] = pattern;
         if (line != null) extra["line"] = line;
         if (condition != null) extra["condition"] = condition;
-        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "break", extra), ct);
+        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "break", extra), ct).ConfigureAwait(false);
         return NdjsonProtocol.GetInt(resp, "id", -1);
     }
 
     public async Task RemoveBreakpointAsync(int id, CancellationToken ct = default)
         => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "delete",
-            new() { ["id"] = id }), ct);
+            new() { ["id"] = id }), ct).ConfigureAwait(false);
 
     public async Task EnableBreakpointAsync(int id, CancellationToken ct = default)
         => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "enable_bp",
-            new() { ["id"] = id }), ct);
+            new() { ["id"] = id }), ct).ConfigureAwait(false);
 
     public async Task DisableBreakpointAsync(int id, CancellationToken ct = default)
         => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "disable_bp",
-            new() { ["id"] = id }), ct);
+            new() { ["id"] = id }), ct).ConfigureAwait(false);
 
     public async Task<List<Breakpoint>> ListBreakpointsAsync(CancellationToken ct = default)
     {
-        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "list"), ct);
+        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "list"), ct).ConfigureAwait(false);
         var items = NdjsonProtocol.GetObjectArray(resp, "data");
         var result = new List<Breakpoint>();
         foreach (var bp in items)
@@ -90,23 +90,23 @@ public class DebugChannel
     }
 
     public async Task ContinueAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "continue"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "continue"), ct).ConfigureAwait(false);
 
     public async Task StepAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "step"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "step"), ct).ConfigureAwait(false);
 
     public async Task NextAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "next"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "next"), ct).ConfigureAwait(false);
 
     public async Task FinishAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "finish"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "finish"), ct).ConfigureAwait(false);
 
     public async Task SkipAsync(CancellationToken ct = default)
-        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "skip"), ct);
+        => await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "skip"), ct).ConfigureAwait(false);
 
     public async Task<Msg> InspectAstAsync(CancellationToken ct = default)
     {
-        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "inspect_ast"), ct);
+        var resp = await RequestAsync(NdjsonProtocol.MakeMsg(Ch.Debug, "inspect_ast"), ct).ConfigureAwait(false);
         return NdjsonProtocol.GetObject(resp, "data") ?? new Msg();
     }
 

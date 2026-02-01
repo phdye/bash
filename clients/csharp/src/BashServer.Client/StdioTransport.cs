@@ -47,7 +47,7 @@ public class StdioTransport : ITransport
         if (_reader == null) throw new TransportException("not connected");
         try
         {
-            var line = await _reader.ReadLineAsync();
+            var line = await _reader.ReadLineAsync().ConfigureAwait(false);
             if (line == null)
             {
                 _open = false;
@@ -67,8 +67,8 @@ public class StdioTransport : ITransport
         if (_writer == null) throw new TransportException("not connected");
         try
         {
-            await _writer.BaseStream.WriteAsync(data, ct);
-            await _writer.BaseStream.FlushAsync(ct);
+            await _writer.BaseStream.WriteAsync(data, ct).ConfigureAwait(false);
+            await _writer.BaseStream.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException)
         {
@@ -88,7 +88,7 @@ public class StdioTransport : ITransport
                 _process.WaitForExit(5000);
             }
         }
-        catch { }
+        catch (InvalidOperationException) { /* Process already exited. */ }
         _process?.Dispose();
         return Task.CompletedTask;
     }

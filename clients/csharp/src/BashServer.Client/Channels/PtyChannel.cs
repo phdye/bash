@@ -30,8 +30,8 @@ public class PtyChannel
         if (opts?.Shell != null) extra["shell"] = opts.Shell;
         if (opts?.StripAnsi == true) extra["strip_ansi"] = true;
 
-        await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "spawn", extra));
-        var resp = await _recv(Ch.Pty, ct);
+        await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "spawn", extra)).ConfigureAwait(false);
+        var resp = await _recv(Ch.Pty, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "pty spawn error"), Ch.Pty);
@@ -47,14 +47,14 @@ public class PtyChannel
     {
         var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(data));
         await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "input",
-            new() { ["data"] = encoded, ["encoding"] = "base64" }));
+            new() { ["data"] = encoded, ["encoding"] = "base64" })).ConfigureAwait(false);
     }
 
     public async Task ResizeAsync(int rows, int cols, CancellationToken ct = default)
     {
         await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "resize",
-            new() { ["rows"] = rows, ["cols"] = cols }));
-        var resp = await _recv(Ch.Pty, ct);
+            new() { ["rows"] = rows, ["cols"] = cols })).ConfigureAwait(false);
+        var resp = await _recv(Ch.Pty, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "resize error"), Ch.Pty);
@@ -63,8 +63,8 @@ public class PtyChannel
     public async Task SignalAsync(string name, CancellationToken ct = default)
     {
         await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "signal",
-            new() { ["signal"] = name }));
-        var resp = await _recv(Ch.Pty, ct);
+            new() { ["signal"] = name })).ConfigureAwait(false);
+        var resp = await _recv(Ch.Pty, ct).ConfigureAwait(false);
         if (NdjsonProtocol.GetType(resp) == "error")
             throw new ServerException(
                 NdjsonProtocol.GetString(resp, "message", "signal error"), Ch.Pty);
@@ -72,7 +72,7 @@ public class PtyChannel
 
     public async Task CloseAsync(CancellationToken ct = default)
     {
-        await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "close"));
+        await _send(NdjsonProtocol.MakeMsg(Ch.Pty, "close")).ConfigureAwait(false);
     }
 
     internal void Dispatch(Msg msg)
@@ -89,7 +89,7 @@ public class PtyChannel
                         data = System.Text.Encoding.UTF8.GetString(
                             Convert.FromBase64String(data));
                     }
-                    catch { }
+                    catch (FormatException) { /* Malformed base64; use raw data. */ }
                 }
                 Output?.Invoke(this, data);
                 break;

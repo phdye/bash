@@ -32,7 +32,7 @@ func ConnectUnixSocket(ctx context.Context, path string) (*UnixSocketTransport, 
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", path)
 	if err != nil {
-		return nil, newTransportError(fmt.Sprintf("cannot connect to %s: %v", path, err))
+		return nil, newTransportErrorf(err, "cannot connect to %s: %v", path, err)
 	}
 	return &UnixSocketTransport{
 		conn:   conn,
@@ -41,6 +41,7 @@ func ConnectUnixSocket(ctx context.Context, path string) (*UnixSocketTransport, 
 	}, nil
 }
 
+// ReadLine reads one NDJSON line from the socket.
 func (t *UnixSocketTransport) ReadLine() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
@@ -50,11 +51,12 @@ func (t *UnixSocketTransport) ReadLine() ([]byte, error) {
 		if err == io.EOF {
 			return nil, newTransportError("connection closed")
 		}
-		return nil, newTransportError(fmt.Sprintf("read error: %v", err))
+		return nil, newTransportErrorf(err, "read error: %v", err)
 	}
 	return line, nil
 }
 
+// Write sends data to the socket.
 func (t *UnixSocketTransport) Write(data []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -64,11 +66,12 @@ func (t *UnixSocketTransport) Write(data []byte) error {
 	_, err := t.conn.Write(data)
 	if err != nil {
 		t.open = false
-		return newTransportError(fmt.Sprintf("write error: %v", err))
+		return newTransportErrorf(err, "write error: %v", err)
 	}
 	return nil
 }
 
+// Close closes the socket connection.
 func (t *UnixSocketTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -79,6 +82,7 @@ func (t *UnixSocketTransport) Close() error {
 	return nil
 }
 
+// IsOpen returns true if the socket is open.
 func (t *UnixSocketTransport) IsOpen() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -102,15 +106,15 @@ func ConnectStdioTransport(ctx context.Context, args ...string) (*StdioTransport
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return nil, newTransportError(fmt.Sprintf("cannot create stdin pipe: %v", err))
+		return nil, newTransportErrorf(err, "cannot create stdin pipe: %v", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, newTransportError(fmt.Sprintf("cannot create stdout pipe: %v", err))
+		return nil, newTransportErrorf(err, "cannot create stdout pipe: %v", err)
 	}
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
-		return nil, newTransportError(fmt.Sprintf("cannot start process: %v", err))
+		return nil, newTransportErrorf(err, "cannot start process: %v", err)
 	}
 	return &StdioTransport{
 		cmd:    cmd,
@@ -120,6 +124,7 @@ func ConnectStdioTransport(ctx context.Context, args ...string) (*StdioTransport
 	}, nil
 }
 
+// ReadLine reads one NDJSON line from the subprocess stdout.
 func (t *StdioTransport) ReadLine() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
@@ -129,11 +134,12 @@ func (t *StdioTransport) ReadLine() ([]byte, error) {
 		if err == io.EOF {
 			return nil, newTransportError("connection closed")
 		}
-		return nil, newTransportError(fmt.Sprintf("read error: %v", err))
+		return nil, newTransportErrorf(err, "read error: %v", err)
 	}
 	return line, nil
 }
 
+// Write sends data to the subprocess stdin.
 func (t *StdioTransport) Write(data []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -143,11 +149,12 @@ func (t *StdioTransport) Write(data []byte) error {
 	_, err := t.writer.Write(data)
 	if err != nil {
 		t.open = false
-		return newTransportError(fmt.Sprintf("write error: %v", err))
+		return newTransportErrorf(err, "write error: %v", err)
 	}
 	return nil
 }
 
+// Close kills the subprocess and releases resources.
 func (t *StdioTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -162,6 +169,7 @@ func (t *StdioTransport) Close() error {
 	return nil
 }
 
+// IsOpen returns true if the subprocess is still running.
 func (t *StdioTransport) IsOpen() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -189,6 +197,7 @@ func ConnectFdTransport(_ context.Context, fd int) (*FdTransport, error) {
 	}, nil
 }
 
+// ReadLine reads one NDJSON line from the file descriptor.
 func (t *FdTransport) ReadLine() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
@@ -198,11 +207,12 @@ func (t *FdTransport) ReadLine() ([]byte, error) {
 		if err == io.EOF {
 			return nil, newTransportError("connection closed")
 		}
-		return nil, newTransportError(fmt.Sprintf("read error: %v", err))
+		return nil, newTransportErrorf(err, "read error: %v", err)
 	}
 	return line, nil
 }
 
+// Write sends data to the file descriptor.
 func (t *FdTransport) Write(data []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -212,11 +222,12 @@ func (t *FdTransport) Write(data []byte) error {
 	_, err := t.file.Write(data)
 	if err != nil {
 		t.open = false
-		return newTransportError(fmt.Sprintf("write error: %v", err))
+		return newTransportErrorf(err, "write error: %v", err)
 	}
 	return nil
 }
 
+// Close closes the file descriptor.
 func (t *FdTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -227,6 +238,7 @@ func (t *FdTransport) Close() error {
 	return nil
 }
 
+// IsOpen returns true if the file descriptor is open.
 func (t *FdTransport) IsOpen() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -247,7 +259,7 @@ func ConnectNamedPipeTransport(ctx context.Context, pipeName string) (*NamedPipe
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", pipeName)
 	if err != nil {
-		return nil, newTransportError(fmt.Sprintf("cannot connect to pipe %s: %v", pipeName, err))
+		return nil, newTransportErrorf(err, "cannot connect to pipe %s: %v", pipeName, err)
 	}
 	return &NamedPipeTransport{
 		conn:   conn,
@@ -256,6 +268,7 @@ func ConnectNamedPipeTransport(ctx context.Context, pipeName string) (*NamedPipe
 	}, nil
 }
 
+// ReadLine reads one NDJSON line from the pipe.
 func (t *NamedPipeTransport) ReadLine() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
@@ -265,11 +278,12 @@ func (t *NamedPipeTransport) ReadLine() ([]byte, error) {
 		if err == io.EOF {
 			return nil, newTransportError("connection closed")
 		}
-		return nil, newTransportError(fmt.Sprintf("read error: %v", err))
+		return nil, newTransportErrorf(err, "read error: %v", err)
 	}
 	return line, nil
 }
 
+// Write sends data to the pipe.
 func (t *NamedPipeTransport) Write(data []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -279,11 +293,12 @@ func (t *NamedPipeTransport) Write(data []byte) error {
 	_, err := t.conn.Write(data)
 	if err != nil {
 		t.open = false
-		return newTransportError(fmt.Sprintf("write error: %v", err))
+		return newTransportErrorf(err, "write error: %v", err)
 	}
 	return nil
 }
 
+// Close closes the named pipe connection.
 func (t *NamedPipeTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -294,6 +309,7 @@ func (t *NamedPipeTransport) Close() error {
 	return nil
 }
 
+// IsOpen returns true if the pipe connection is open.
 func (t *NamedPipeTransport) IsOpen() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -331,6 +347,7 @@ func NewPipeTransport() (client *PipeTransport, server *PipeTransport) {
 	return
 }
 
+// ReadLine reads one NDJSON line from the in-memory pipe.
 func (t *PipeTransport) ReadLine() ([]byte, error) {
 	line, err := t.reader.ReadBytes('\n')
 	if err != nil {
@@ -340,11 +357,12 @@ func (t *PipeTransport) ReadLine() ([]byte, error) {
 		if err == io.EOF {
 			return nil, newTransportError("connection closed")
 		}
-		return nil, newTransportError(fmt.Sprintf("read error: %v", err))
+		return nil, newTransportErrorf(err, "read error: %v", err)
 	}
 	return line, nil
 }
 
+// Write sends data to the in-memory pipe.
 func (t *PipeTransport) Write(data []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -354,11 +372,12 @@ func (t *PipeTransport) Write(data []byte) error {
 	_, err := t.writer.Write(data)
 	if err != nil {
 		t.open = false
-		return newTransportError(fmt.Sprintf("write error: %v", err))
+		return newTransportErrorf(err, "write error: %v", err)
 	}
 	return nil
 }
 
+// Close closes both ends of the pipe.
 func (t *PipeTransport) Close() error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -372,6 +391,7 @@ func (t *PipeTransport) Close() error {
 	return nil
 }
 
+// IsOpen returns true if the pipe is open.
 func (t *PipeTransport) IsOpen() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()

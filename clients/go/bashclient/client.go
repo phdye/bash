@@ -3,6 +3,7 @@ package bashclient
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 // sendFunc is the type for sending a message.
@@ -183,24 +184,20 @@ func (c *BashClient) Ping(ctx context.Context) error {
 	return c.Control.Ping(ctx)
 }
 
-// Close closes the connection.
+// Close closes the connection gracefully. It sends a disconnect message
+// with a short timeout before closing the transport.
 func (c *BashClient) Close() error {
 	var err error
 	c.closeOnce.Do(func() {
-		// Send disconnect (ignore errors)
-		ctx, cancel := context.WithCancel(context.Background())
-		// Use a very short-lived context for disconnect
-		go func() {
-			defer cancel()
-			c.Control.Disconnect(ctx)
-		}()
-		// Don't wait long for disconnect response
-		<-ctx.Done()
+		// Send disconnect with a short timeout (best-effort).
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		_ = c.Control.Disconnect(ctx)
+		cancel()
 
-		// Signal reader to stop
+		// Signal reader to stop.
 		close(c.done)
 
-		// Close transport
+		// Close transport.
 		err = c.transport.Close()
 	})
 	return err

@@ -30,7 +30,7 @@ public class FdTransport : ITransport
         if (_reader == null) throw new TransportException("not connected");
         try
         {
-            var line = await _reader.ReadLineAsync();
+            var line = await _reader.ReadLineAsync().ConfigureAwait(false);
             if (line == null)
             {
                 _open = false;
@@ -50,8 +50,8 @@ public class FdTransport : ITransport
         if (_stream == null) throw new TransportException("not connected");
         try
         {
-            await _stream.WriteAsync(data, ct);
-            await _stream.FlushAsync(ct);
+            await _stream.WriteAsync(data, ct).ConfigureAwait(false);
+            await _stream.FlushAsync(ct).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException)
         {
@@ -64,7 +64,7 @@ public class FdTransport : ITransport
     {
         _open = false;
         _reader?.Dispose();
-        if (_stream != null) await _stream.DisposeAsync();
+        if (_stream != null) await _stream.DisposeAsync().ConfigureAwait(false);
     }
 
     public bool IsOpen => _open;

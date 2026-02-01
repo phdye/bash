@@ -6,7 +6,14 @@
     <RootNamespace>BashServer.Client</RootNamespace>
     <PackageId>BashServer.Client</PackageId>
     <Version>0.1.0</Version>
-    <Description>C# client for bash-server v2 NDJSON protocol</Description>
+    <Authors>bash-server contributors</Authors>
+    <Description>C# client library for bash-server v2 NDJSON protocol. Provides async access to command evaluation, state management, observation, debugging, and PTY channels.</Description>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <PackageTags>bash;shell;ndjson;ipc;client</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>

@@ -1,0 +1,17 @@
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.csproj.user
+launchSettings.json

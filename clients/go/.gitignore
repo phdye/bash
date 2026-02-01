@@ -1,0 +1,9 @@
+# Build artifacts
+*.exe
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
