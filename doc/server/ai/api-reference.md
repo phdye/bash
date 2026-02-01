@@ -1,5 +1,18 @@
 # API Reference — bash-server
 
+## Client Libraries
+
+Each library implements the v2 protocol natively. Use a client library instead of constructing protocol frames directly. See [integration.md](integration.md#client-libraries) for install and usage details.
+
+| Language | Package | Native v2 protocol | All 4 transports | All 6 channels |
+|----------|---------|-------------------|-------------------|----------------|
+| Python | bashclient | yes | yes | yes |
+| TypeScript | bashclient | yes | yes | yes |
+| Go | bashclient | yes | yes | yes |
+| C# | BashServer.Client | yes | yes | yes |
+| C | libbashclient | yes | yes | yes |
+| Java | org.gnu.bash.client | yes | yes | yes |
+
 ## Constants
 
 | Name | Value | Description |

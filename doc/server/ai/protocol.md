@@ -1,5 +1,7 @@
 # bash-server Wire Protocol
 
+This document describes the wire protocol for implementors of new client libraries. For application development, use an existing client library (see [integration.md](integration.md#client-libraries)). Client libraries for Python, TypeScript, Go, C#, C, and Java implement this protocol natively.
+
 ## Protocol Versions
 
 | Version | ID | Wire Format | Detection |

@@ -1,5 +1,7 @@
 # Error Catalog — bash-server
 
+Client libraries wrap these wire-level errors in language-native exceptions/errors. See individual library documentation for error handling patterns. This document is for client library implementors and protocol-level debugging.
+
 Every error string emitted by bash-server, organized by source.
 
 ## Connection and Authentication Errors
