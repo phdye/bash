@@ -55,7 +55,7 @@ python -m venv .venv
 source .venv/bin/activate    # Linux/macOS/Cygwin
 
 # Install in editable mode with dev dependencies
-cd clients/python
+cd bash-server/clients/python
 pip install -e ".[dev]"
 
 # Verify the installation
@@ -79,7 +79,7 @@ configuration:
 ## Project Structure
 
 ```
-clients/python/
+bash-server/clients/python/
     bashclient/             # Package source
         __init__.py         # Public API, __version__, __all__
         client.py           # BashClient class

@@ -86,10 +86,10 @@ You can also supply a fixed token with `--token` when starting the server.
 
 ```bash
 # From the repository root
-pip install -e clients/python
+pip install -e bash-server/clients/python
 
 # Or for development (includes pytest)
-pip install -e "clients/python[dev]"
+pip install -e "bash-server/clients/python[dev]"
 ```
 
 Verify the installation:

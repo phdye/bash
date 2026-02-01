@@ -18,16 +18,16 @@ man pages.
 # Available bindings
 
 Six client bindings are available, each in its own subdirectory under
-`clients/`:
+`bash-server/clients/`:
 
 | Binding    | Package              | Version | Language   | Directory          |
 |------------|----------------------|---------|------------|--------------------|
-| Python     | `bashclient`         | 0.1.0   | Python 3.8+| `clients/python`   |
-| TypeScript | `bashclient`         | 0.1.0   | Node.js 16+| `clients/typescript`|
-| C          | `libbashclient`      | 0.1.0   | C99/POSIX  | `clients/c`        |
-| Java       | `org.gnu.bash:bashclient` | 0.1.0 | Java 11+ | `clients/java`     |
-| Go         | `bashclient`         | 0.1.0   | Go 1.21+   | `clients/go`       |
-| C#         | `BashServer.Client`  | 0.1.0   | .NET 6.0+  | `clients/csharp`   |
+| Python     | `bashclient`         | 0.1.0   | Python 3.8+| `bash-server/clients/python`   |
+| TypeScript | `bashclient`         | 0.1.0   | Node.js 16+| `bash-server/clients/typescript`|
+| C          | `libbashclient`      | 0.1.0   | C99/POSIX  | `bash-server/clients/c`        |
+| Java       | `org.gnu.bash:bashclient` | 0.1.0 | Java 11+ | `bash-server/clients/java`     |
+| Go         | `bashclient`         | 0.1.0   | Go 1.21+   | `bash-server/clients/go`       |
+| C#         | `BashServer.Client`  | 0.1.0   | .NET 6.0+  | `bash-server/clients/csharp`   |
 
 All bindings target the v2 NDJSON wire format.  None depend on the
 binary v2 frame format -- NDJSON is the standard client-side protocol.
@@ -255,7 +255,7 @@ concrete error types implementing the `error` interface, checked via
 **Python:**
 
 ```sh
-cd clients/python
+cd bash-server/clients/python
 pip install -e .
 # or: pip install -e ".[dev]"  (with test dependencies)
 ```
@@ -263,7 +263,7 @@ pip install -e .
 **TypeScript:**
 
 ```sh
-cd clients/typescript
+cd bash-server/clients/typescript
 npm install
 npm run build
 ```
@@ -271,7 +271,7 @@ npm run build
 **C:**
 
 ```sh
-cd clients/c
+cd bash-server/clients/c
 make
 # produces libbashclient.a and libbashclient.so
 ```
@@ -279,21 +279,21 @@ make
 **Java:**
 
 ```sh
-cd clients/java
+cd bash-server/clients/java
 mvn package
 ```
 
 **Go:**
 
 ```sh
-cd clients/go
+cd bash-server/clients/go
 go build ./...
 ```
 
 **C#:**
 
 ```sh
-cd clients/csharp
+cd bash-server/clients/csharp
 dotnet build
 ```
 

@@ -74,7 +74,7 @@ export BASH_SERVER_TOKEN=$(cat /tmp/bash-server-$(id -u)/token)
 Install bashclient if you have not already:
 
 ```bash
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 ### Python Version

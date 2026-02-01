@@ -4,7 +4,7 @@
 
 The **api-metadata.json** file is a machine-readable API index placed in
 the root of each client binding package directory (e.g.,
-`clients/python/api-metadata.json`, `clients/typescript/api-metadata.json`).
+`bash-server/clients/python/api-metadata.json`, `bash-server/clients/typescript/api-metadata.json`).
 It provides a complete, structured description of every public class,
 method, type, error, and constant exported by that binding.
 
@@ -391,7 +391,7 @@ The **api-metadata.json** file MUST reside at the root of its client
 binding directory:
 
 ```
-clients/
+bash-server/clients/
   python/
     api-metadata.json
     bashclient/

@@ -122,9 +122,9 @@ Step-by-step sequences for common integration tasks.
 
 | Language | Path |
 |----------|------|
-| Go | [clients/go/README.md](../../../clients/go/README.md) |
-| C# | [clients/csharp/README.md](../../../clients/csharp/README.md) |
-| Python | [clients/python/README.md](../../../clients/python/README.md) |
-| TypeScript | [clients/typescript/README.md](../../../clients/typescript/README.md) |
-| C | [clients/c/README.md](../../../clients/c/README.md) |
-| Java | [clients/java/README.md](../../../clients/java/README.md) |
+| Go | [clients/go/README.md](../../../bash-server/clients/go/README.md) |
+| C# | [clients/csharp/README.md](../../../bash-server/clients/csharp/README.md) |
+| Python | [clients/python/README.md](../../../bash-server/clients/python/README.md) |
+| TypeScript | [clients/typescript/README.md](../../../bash-server/clients/typescript/README.md) |
+| C | [clients/c/README.md](../../../bash-server/clients/c/README.md) |
+| Java | [clients/java/README.md](../../../bash-server/clients/java/README.md) |

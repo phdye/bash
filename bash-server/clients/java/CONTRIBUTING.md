@@ -41,7 +41,7 @@
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd bash/clients/java
+cd bash/bash-server/clients/java
 
 # Build and run tests
 mvn verify
@@ -79,7 +79,7 @@ echo "BASH_SERVER_TOKEN=$TOKEN"
 ## Project Structure
 
 ```
-clients/java/
+bash-server/clients/java/
   pom.xml                            # Maven build configuration
   INSTALL.md                         # Installation guide
   GUIDE.md                           # Usage guide

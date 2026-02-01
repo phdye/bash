@@ -19,10 +19,10 @@ caller invokes `bc_poll()`.
 
 # Installation
 
-The library is located at `clients/c/` and uses a plain Makefile:
+The library is located at `bash-server/clients/c/` and uses a plain Makefile:
 
 ```sh
-cd clients/c
+cd bash-server/clients/c
 make
 ```
 
@@ -36,11 +36,11 @@ To link against the library:
 
 ```sh
 # Static
-cc -o myprogram myprogram.c -Iclients/c/include -Lclients/c -lbashclient
+cc -o myprogram myprogram.c -Ibash-server/clients/c/include -Lbash-server/clients/c -lbashclient
 
 # Shared
-cc -o myprogram myprogram.c -Iclients/c/include -Lclients/c -lbashclient
-LD_LIBRARY_PATH=clients/c ./myprogram
+cc -o myprogram myprogram.c -Ibash-server/clients/c/include -Lbash-server/clients/c -lbashclient
+LD_LIBRARY_PATH=bash-server/clients/c ./myprogram
 ```
 
 Tests are built and run with:

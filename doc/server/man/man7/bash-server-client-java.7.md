@@ -17,10 +17,10 @@ default timeout) until the response arrives.
 
 # Installation
 
-The library is located at `clients/java/` and uses Maven:
+The library is located at `bash-server/clients/java/` and uses Maven:
 
 ```sh
-cd clients/java
+cd bash-server/clients/java
 mvn package
 ```
 

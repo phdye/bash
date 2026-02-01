@@ -87,7 +87,7 @@ be installed locally first.
 
 ```bash
 # Install to local Maven repository
-cd /path/to/bash/clients/java
+cd /path/to/bash/bash-server/clients/java
 mvn install
 
 # Verify it's in the local repo

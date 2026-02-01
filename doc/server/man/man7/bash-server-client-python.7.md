@@ -17,11 +17,11 @@ callbacks.
 
 # Installation
 
-The package is located at `clients/python/` and uses `pyproject.toml`
+The package is located at `bash-server/clients/python/` and uses `pyproject.toml`
 with setuptools as the build backend:
 
 ```sh
-cd clients/python
+cd bash-server/clients/python
 pip install -e .
 ```
 

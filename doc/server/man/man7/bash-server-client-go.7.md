@@ -17,10 +17,10 @@ a `context.Context` for cancellation and timeout control.
 
 # Installation
 
-The package is located at `clients/go/` and uses Go modules:
+The package is located at `bash-server/clients/go/` and uses Go modules:
 
 ```sh
-cd clients/go
+cd bash-server/clients/go
 go build ./...
 ```
 

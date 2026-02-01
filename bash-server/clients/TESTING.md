@@ -583,7 +583,7 @@ void testEvalSendsCorrectRequest() throws Exception {
 ### Python
 
 ```bash
-cd clients/python
+cd bash-server/clients/python
 
 # Install dev dependencies
 pip install -e ".[dev]"
@@ -609,7 +609,7 @@ pytest tests/test_protocol.py::test_encode_frame_basic
 ### TypeScript
 
 ```bash
-cd clients/typescript
+cd bash-server/clients/typescript
 
 # Install dependencies
 npm install
@@ -635,7 +635,7 @@ npx jest -t "encodes frame"
 ### C
 
 ```bash
-cd clients/c
+cd bash-server/clients/c
 
 # Build and run all tests
 make check
@@ -658,7 +658,7 @@ make clean-tests
 ### Java
 
 ```bash
-cd clients/java
+cd bash-server/clients/java
 
 # Run all tests
 mvn test
@@ -1051,7 +1051,7 @@ jobs:
         with:
           python-version: "3.8"
       - run: |
-          cd clients/python
+          cd bash-server/clients/python
           pip install -e ".[dev]"
           pytest --cov=bashclient
 
@@ -1063,7 +1063,7 @@ jobs:
         with:
           node-version: "16"
       - run: |
-          cd clients/typescript
+          cd bash-server/clients/typescript
           npm install
           npm test -- --coverage
 
@@ -1072,7 +1072,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          cd clients/c
+          cd bash-server/clients/c
           make check
 
   java:
@@ -1084,7 +1084,7 @@ jobs:
           java-version: "11"
           distribution: "temurin"
       - run: |
-          cd clients/java
+          cd bash-server/clients/java
           mvn test
 ```
 
@@ -1109,7 +1109,7 @@ Integration tests require a bash-server binary. In CI, either:
           export PATH="$PWD:$PATH"
       - name: Run integration tests (all bindings)
         run: |
-          cd clients/python && pytest tests/test_integration.py
+          cd bash-server/clients/python && pytest tests/test_integration.py
           cd ../typescript && npx jest test/integration.test.ts
           cd ../c && ./tests/test_integration
           cd ../java && mvn test -Dtest=IntegrationTest

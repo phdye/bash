@@ -6,7 +6,7 @@ Targets .NET 6.0+. Zero external dependencies (stdlib only).
 ## Installation
 
 ```sh
-cd clients/csharp
+cd bash-server/clients/csharp
 dotnet build
 ```
 

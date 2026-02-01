@@ -72,7 +72,7 @@ For the impatient:
 
 ```bash
 git clone <repository-url>
-cd clients/c
+cd bash-server/clients/c
 make
 sudo make install
 ```
@@ -95,11 +95,11 @@ gcc -o myapp myapp.c -lbashclient
 
 ### Obtaining the Source
 
-The libbashclient source is located in the `clients/c/` subdirectory of the
+The libbashclient source is located in the `bash-server/clients/c/` subdirectory of the
 bash-server repository:
 
 ```
-clients/c/
+bash-server/clients/c/
   include/
     bashclient.h        Public API header
   src/

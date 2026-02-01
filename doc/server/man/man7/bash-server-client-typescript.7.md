@@ -15,10 +15,10 @@ and registered event callbacks.
 
 # Installation
 
-The package is located at `clients/typescript/` and uses npm:
+The package is located at `bash-server/clients/typescript/` and uses npm:
 
 ```sh
-cd clients/typescript
+cd bash-server/clients/typescript
 npm install
 npm run build
 ```

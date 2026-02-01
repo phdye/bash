@@ -5,7 +5,7 @@ Async Python client for the bash-server v2 NDJSON protocol.
 ## Installation
 
 ```bash
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 ## Quick Start

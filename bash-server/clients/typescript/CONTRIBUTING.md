@@ -36,7 +36,7 @@ requirements, and the pull request process.
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/bash.git
-cd bash/clients/typescript
+cd bash/bash-server/clients/typescript
 
 # Install dependencies
 npm install
@@ -82,7 +82,7 @@ git push origin feature/my-feature
 ## Project Structure
 
 ```
-clients/typescript/
+bash-server/clients/typescript/
 ├── src/                    # Source code (TypeScript)
 │   ├── index.ts            # Public API re-exports
 │   ├── client.ts           # BashClient class

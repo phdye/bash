@@ -18,10 +18,10 @@ All request/response operations are async and accept a
 
 # Installation
 
-The package is located at `clients/csharp/` and uses the .NET CLI:
+The package is located at `bash-server/clients/csharp/` and uses the .NET CLI:
 
 ```sh
-cd clients/csharp
+cd bash-server/clients/csharp
 dotnet build
 ```
 

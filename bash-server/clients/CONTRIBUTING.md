@@ -37,7 +37,7 @@ each binding's directory:
 ## Project Structure
 
 ```
-clients/
+bash-server/clients/
     README.md               Overview and quick comparison
     CONTRIBUTING.md          This file (shared contributor guide)
     COMPARISON.md            Language selection guide
@@ -286,10 +286,10 @@ follow this process.
 
 ### Directory Structure
 
-Create `clients/<language>/` with:
+Create `bash-server/clients/<language>/` with:
 
 ```
-clients/<language>/
+bash-server/clients/<language>/
     README.md               Quick start, API overview, installation
     examples/               At least 3 working examples
     <source>/               Source organized by module
@@ -307,7 +307,7 @@ clients/<language>/
 - [ ] Integration tests with `bash-server --stdio`
 - [ ] README.md with quick start and API overview
 - [ ] At least 3 working examples
-- [ ] Added to the top-level clients/README.md matrix
+- [ ] Added to the top-level bash-server/clients/README.md matrix
 - [ ] Added to COMPARISON.md
 - [ ] CI configuration added
 - [ ] License header in all source files
@@ -486,21 +486,21 @@ Every binding must have tests at all three levels:
 
 ```bash
 # Python
-cd clients/python
+cd bash-server/clients/python
 pip install -e ".[dev]"
 pytest
 
 # TypeScript
-cd clients/typescript
+cd bash-server/clients/typescript
 npm install
 npm test
 
 # C
-cd clients/c
+cd bash-server/clients/c
 make check
 
 # Java
-cd clients/java
+cd bash-server/clients/java
 mvn test
 ```
 
@@ -583,7 +583,7 @@ description and check off each item.
 - [ ] Tests added in **all 4 bindings**
 - [ ] PROTOCOL.md updated with wire examples
 - [ ] README.md updated in each binding
-- [ ] clients/README.md channel table updated
+- [ ] bash-server/clients/README.md channel table updated
 
 ### New Transport PRs
 
@@ -592,7 +592,7 @@ description and check off each item.
 - [ ] Tests added in **all 4 bindings**
 - [ ] PROTOCOL.md updated
 - [ ] README.md updated in each binding
-- [ ] clients/README.md transport table updated
+- [ ] bash-server/clients/README.md transport table updated
 
 ### New Binding PRs
 
@@ -602,7 +602,7 @@ description and check off each item.
 - [ ] Three tiers of tests (unit, channel, integration)
 - [ ] README.md with quick start and full API overview
 - [ ] At least 3 working examples
-- [ ] clients/README.md updated with new row
+- [ ] bash-server/clients/README.md updated with new row
 - [ ] COMPARISON.md updated with new column
 - [ ] TESTING.md updated with new language section
 - [ ] Build/package configuration (Makefile, pom.xml, etc.)
@@ -696,7 +696,7 @@ All four bindings share the same version number. When releasing:
    - `c/Makefile` (`VERSION = X.Y.Z`)
    - `java/pom.xml` (`<version>X.Y.Z</version>`)
 
-2. Update `clients/README.md` if any table content changed.
+2. Update `bash-server/clients/README.md` if any table content changed.
 
 3. Create a single commit: `chore(clients): release vX.Y.Z`
 
@@ -756,7 +756,7 @@ longer as they need reviewers familiar with multiple languages.
 
 ## License
 
-All code in the `clients/` directory is licensed under the
+All code in the `bash-server/clients/` directory is licensed under the
 **GNU General Public License v3 or later** (GPLv3+).
 
 Every source file must include a license header:

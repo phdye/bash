@@ -67,7 +67,7 @@ If you just want to get started:
 
 ```bash
 cd /path/to/bash          # Repository root
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 Verify:
@@ -88,13 +88,13 @@ code take effect immediately without reinstalling.
 
 ```bash
 # From the bash repository root
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 Or, if you are inside the Python package directory:
 
 ```bash
-cd clients/python
+cd bash-server/clients/python
 pip install -e .
 ```
 
@@ -107,7 +107,7 @@ immediately.
 Build a source distribution and install it:
 
 ```bash
-cd clients/python
+cd bash-server/clients/python
 
 # Build the sdist
 python -m build --sdist
@@ -131,10 +131,10 @@ To install for all users on the system (requires root/admin privileges):
 
 ```bash
 # Linux / macOS / Cygwin
-sudo pip install clients/python
+sudo pip install bash-server/clients/python
 
 # Or from within the package directory
-cd clients/python
+cd bash-server/clients/python
 sudo pip install .
 ```
 
@@ -149,7 +149,7 @@ For development work (running tests, linting, type checking), install
 with the `dev` extras:
 
 ```bash
-cd clients/python
+cd bash-server/clients/python
 pip install -e ".[dev]"
 ```
 
@@ -418,7 +418,7 @@ asyncio.run(test())
 
 ## pyproject.toml Reference
 
-The package is configured via `pyproject.toml` in the `clients/python/`
+The package is configured via `pyproject.toml` in the `bash-server/clients/python/`
 directory. Key sections:
 
 ```toml
@@ -471,7 +471,7 @@ git pull
 Reinstall from source:
 
 ```bash
-pip install --upgrade clients/python
+pip install --upgrade bash-server/clients/python
 ```
 
 Or from an sdist:
@@ -525,7 +525,7 @@ python -m ensurepip --upgrade
 Or use the module directly:
 
 ```bash
-python -m pip install -e clients/python
+python -m pip install -e bash-server/clients/python
 ```
 
 ### "python: command not found" (Cygwin)
@@ -556,7 +556,7 @@ pip install --upgrade setuptools pip
 **Fix**: Use `--user` flag or a virtual environment:
 
 ```bash
-pip install --user -e clients/python
+pip install --user -e bash-server/clients/python
 ```
 
 ### "ModuleNotFoundError: No module named 'setuptools'"

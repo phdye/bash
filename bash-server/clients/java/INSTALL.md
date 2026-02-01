@@ -85,7 +85,7 @@ The fastest path to a working setup:
 
 ```bash
 # Clone and build from source
-cd /path/to/bash/clients/java
+cd /path/to/bash/bash-server/clients/java
 mvn package -DskipTests
 
 # Or install to local Maven repository
@@ -320,7 +320,7 @@ tasks.test {
 
 ```bash
 # Navigate to the Java client directory
-cd /path/to/bash/clients/java
+cd /path/to/bash/bash-server/clients/java
 
 # Build without tests (fastest)
 mvn package -DskipTests
@@ -370,7 +370,7 @@ target/
 
 ### IntelliJ IDEA
 
-1. **Open project**: File > Open > select the `clients/java` directory
+1. **Open project**: File > Open > select the `bash-server/clients/java` directory
 2. IntelliJ auto-detects the `pom.xml` and imports the Maven project
 3. **Set JDK**: File > Project Structure > Project > SDK = Java 11+
 4. **Reload Maven**: Right-click `pom.xml` > Maven > Reload Project
@@ -393,7 +393,7 @@ target/
 ### Eclipse
 
 1. **Import**: File > Import > Maven > Existing Maven Projects
-2. Browse to the `clients/java` directory
+2. Browse to the `bash-server/clients/java` directory
 3. Select the `pom.xml` and click Finish
 4. **Configure JRE**: Right-click project > Properties > Java Build Path > Libraries
    - Ensure JRE System Library is Java 11+
@@ -408,7 +408,7 @@ target/
 ### VS Code
 
 1. Install the **Extension Pack for Java** (includes Maven support)
-2. Open the `clients/java` directory
+2. Open the `bash-server/clients/java` directory
 3. VS Code auto-detects the Maven project
 4. Use the Maven sidebar to run build targets
 5. Use the Testing sidebar to run JUnit tests
@@ -426,7 +426,7 @@ target/
 
 ### NetBeans
 
-1. File > Open Project > select the `clients/java` directory
+1. File > Open Project > select the `bash-server/clients/java` directory
 2. NetBeans recognizes the Maven project automatically
 3. Right-click project > Build (or press F11)
 4. Right-click project > Test to run all tests

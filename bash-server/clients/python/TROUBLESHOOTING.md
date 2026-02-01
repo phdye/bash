@@ -95,7 +95,7 @@ cygcheck -l python3
 python -m pip install --upgrade pip setuptools
 
 # Retry installation
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 If pip itself is missing:
@@ -121,7 +121,7 @@ python -m pip list | grep bashclient
 source .venv/bin/activate
 
 # Reinstall if needed
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 ---

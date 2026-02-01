@@ -84,7 +84,7 @@ the channel logic deals in typed C structures.
 ## Source Structure
 
 ```
-clients/c/
+bash-server/clients/c/
   include/
     bashclient.h          Public API header
                             - All public types (bc_client_t, bc_eval_result_t, ...)

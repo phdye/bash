@@ -143,7 +143,7 @@ This uses the exact versions from `package-lock.json`.
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/bash.git
-cd bash/clients/typescript
+cd bash/bash-server/clients/typescript
 
 # Install development dependencies
 npm install
@@ -176,7 +176,7 @@ npx tsc --watch
 ### Source Directory Layout
 
 ```
-clients/typescript/
+bash-server/clients/typescript/
 ├── src/
 │   ├── index.ts          # Public API re-exports
 │   ├── client.ts         # BashClient class
@@ -271,7 +271,7 @@ dist/
 
 ```bash
 # 1. Clone and navigate to the TypeScript client
-cd bash/clients/typescript
+cd bash/bash-server/clients/typescript
 
 # 2. Install all dependencies (including dev deps)
 npm install
@@ -497,7 +497,7 @@ On Windows, use the Cygwin environment for full compatibility:
 node --version
 
 # Install from source
-cd /home/user/bash/clients/typescript
+cd /home/user/bash/bash-server/clients/typescript
 npm install
 npm run build
 npm test
@@ -637,7 +637,7 @@ npm uninstall -g bashclient
 ### Clean Build Artifacts (Source Install)
 
 ```bash
-cd clients/typescript
+cd bash-server/clients/typescript
 npm run clean
 rm -rf node_modules/
 ```

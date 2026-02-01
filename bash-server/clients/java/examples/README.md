@@ -26,7 +26,7 @@ Before running any example:
 1. **Build the library**:
 
 ```bash
-cd /path/to/bash/clients/java
+cd /path/to/bash/bash-server/clients/java
 mvn package
 ```
 

@@ -44,7 +44,7 @@ requirements, and contribution workflow.
 
 ```bash
 # The library lives inside the bash-server repository
-cd clients/c
+cd bash-server/clients/c
 
 # Debug build (recommended for development)
 make DEBUG=1
