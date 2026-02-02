@@ -1,94 +1,138 @@
-CC=clang
-LLD_PATH=/prog/rust/build/x86_64-unknown-linux-gnu/lld/bin
+# Skeleton Makefile for the GNU malloc code
+#
+# Copyright (C) 1996-2009 Free Software Foundation, Inc.
 
-PACKAGE = bash
-prefix = /usr/local
-datarootdir = ${prefix}/share
-datadir = ${datarootdir}
-infodir = ${datarootdir}/info
-localedir = ${datarootdir}/locale
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
 
-Machine = wasm32
-OS = wasi
-VENDOR = wasmer
-MACHTYPE = wasm32-wasmer-wasi
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
 
-CFLAGS = --target=wasm32-wasmer-wasi \
-         -O2 \
-         -include ../../config.h \
-         --sysroot ../../../wasix-libc/sysroot32 \
-         -I. \
-         -I.. \
-         -I../.. \
-         -I../../include \
-         -I../../lib \
-         -matomics \
-         -mbulk-memory \
-         -mmutable-globals \
-         -pthread \
-         -mthread-model posix \
-         -ftls-model=local-exec \
-         -fno-trapping-math \
-         -DLOCALEDIR='"$(localedir)"' \
-         -DPACKAGE='"$(PACKAGE)"' \
-         -DCONF_HOSTTYPE='"$(Machine)"' \
-         -DCONF_OSTYPE='"$(OS)"' \
-         -DCONF_MACHTYPE='"$(MACHTYPE)"' \
-         -DCONF_VENDOR='"$(VENDOR)"' \
-         -D_WASI_EMULATED_MMAN \
-         -D_WASI_EMULATED_SIGNAL \
-         -D_WASI_EMULATED_PROCESS_CLOCKS \
-         -Wall \
-         -Wextra \
-         -Werror \
-         -Wno-null-pointer-arithmetic \
-         -Wno-unused-parameter \
-         -Wno-sign-compare \
-         -Wno-unused-variable \
-         -Wno-unused-function \
-         -Wno-ignored-attributes \
-         -Wno-missing-braces \
-         -Wno-ignored-pragmas \
-         -Wno-unused-but-set-variable \
-         -Wno-unknown-warning-option \
-         -Wno-parentheses \
-         -Wno-shift-op-parentheses \
-         -Wno-bitwise-op-parentheses \
-         -Wno-logical-op-parentheses \
-         -Wno-string-plus-int \
-         -Wno-dangling-else \
-         -Wno-unknown-pragmas \
-         -Wno-format-security \
-         -Wno-unused-label \
-         -Wno-incompatible-pointer-types \
-         -Wno-deprecated-non-prototype \
-         -MD \
-         -MP
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-SRC = malloc \
-      trace \
-      stats \
-      table \
-      watch
+srcdir = .
 
-OBJS = $(SRC:=.o)
+topdir = ../..
+BUILD_DIR = /home/phdyex/my-repos/cygwin/bash
 
-.PHONY: malloc stubmalloc
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL}
+INSTALL_DATA = ${INSTALL} -m 644
 
-all: malloc
+CC = gcc
+RANLIB = ranlib
+AR = ar
+ARFLAGS = cr
+RM = rm -f
+CP = cp
+MV = mv
 
-malloc: ${OBJS}
+SHELL = /bin/sh
 
-%: %.c
-	clang $(CFLAGS) \
-              $@.c \
-			  -c \
-              -o $@.o
+PROFILE_FLAGS = 
 
-export PATH := $(LLD_PATH):$(PATH)
+CFLAGS = -g -O2 -Wno-parentheses -Wno-format-security
+LOCAL_CFLAGS = -DRECYCLES_PIDS
+CPPFLAGS = -I/home/phdyex/include
+LDFLAGS = 
 
-clean:
-	rm -f *.o
-	rm -f *.s
-	rm -f *.ll
-	rm -f *.wasm
+DEFS = -DHAVE_CONFIG_H
+LOCAL_DEFS = -DSHELL
+
+LIBBUILD = ${BUILD_DIR}/lib
+
+BASHINCDIR = ${topdir}/include
+
+INTL_LIBSRC = ${topdir}/lib/intl
+INTL_BUILDDIR = ${LIBBUILD}/intl
+INTL_INC = 
+LIBINTL_H = 
+
+INCLUDES = -I. -I../.. -I$(topdir) -I$(BASHINCDIR) -I$(topdir)/lib $(INTL_INC)
+
+CCFLAGS = ${PROFILE_FLAGS} ${INCLUDES} $(DEFS) $(LOCAL_DEFS) $(LOCAL_CFLAGS) \
+	  $(CFLAGS) $(MALLOC_CFLAGS) $(CPPFLAGS)
+
+.c.o:
+	$(CC) $(CCFLAGS) -c $<
+
+.s.o:
+	$(CC) $(CCFLAGS) -c $<
+
+MALLOC_SOURCE = malloc.c
+STUB_SOURCE = stub.c
+
+ALLOCA_SOURCE = alloca.c
+ALLOCA_OBJECT = alloca.o
+
+MALLOC_SRC = 
+MALLOC = @MALLOC@
+ALLOCA = 
+
+MALLOC_OBJS = malloc.o $(ALLOCA) trace.o stats.o table.o watch.o
+STUB_OBJS = $(ALLOCA) stub.o
+
+.PHONY:		malloc stubmalloc
+
+all:		malloc
+
+malloc: ${MALLOC_OBJS}
+	${RM} libmalloc.a
+	${AR} ${ARFLAGS} libmalloc.a ${MALLOC_OBJS}
+	-test -n "$(RANLIB)" && $(RANLIB) libmalloc.a
+
+stubmalloc: ${STUB_OBJS}
+	${RM} libmalloc.a
+	${AR} ${ARFLAGS} libmalloc.a ${STUB_OBJS}
+	-test -n "$(RANLIB)" && $(RANLIB) libmalloc.a
+
+alloca: ${ALLOCA}
+	${RM} libmalloc.a
+	${AR} ${ARFLAGS} libmalloc.a ${ALLOCA}
+	-test -n "$(RANLIB)" && $(RANLIB) libmalloc.a
+
+alloca.o:	$(srcdir)/$(ALLOCA_SOURCE)
+	$(CC) $(CCFLAGS) -c $(srcdir)/$(ALLOCA_SOURCE)
+	@- if test "$(ALLOCA_OBJECT)" != alloca.o ; then \
+		mv $(ALLOCA_OBJECT) alloca.o >/dev/null 2>&1 ; \
+	fi
+
+mostlyclean clean:
+	$(RM) *.o libmalloc.a
+
+distclean realclean maintainer-clean: clean
+	$(RM) Makefile
+
+alloca.o: $(BUILD_DIR)/config.h
+malloc.o: $(BUILD_DIR)/config.h $(topdir)/bashtypes.h getpagesize.h
+xmalloc.o: $(BUILD_DIR)/config.h $(BASHINCDIR)/ansi_stdlib.h
+trace.o: ${BUILD_DIR}/config.h
+stats.o: ${BUILD_DIR}/config.h
+table.o: ${BUILD_DIR}/config.h
+watch.o: ${BUILD_DIR}/config.h
+
+malloc.o: ${srcdir}/imalloc.h ${srcdir}/mstats.h
+malloc.o: ${srcdir}/table.h ${srcdir}/watch.h
+stats.o: ${srcdir}/imalloc.h ${srcdir}/mstats.h
+trace.o: ${srcdir}/imalloc.h
+table.o: ${srcdir}/imalloc.h ${srcdir}/table.h
+watch.o: ${srcdir}/imalloc.h ${srcdir}/watch.h
+
+malloc.o: ${topdir}/bashintl.h ${LIBINTL_H} ${BASHINCDIR}/gettext.h
+stats.o: ${topdir}/bashintl.h ${LIBINTL_H} ${BASHINCDIR}/gettext.h
+trace.o: ${topdir}/bashintl.h ${LIBINTL_H} ${BASHINCDIR}/gettext.h
+table.o: ${topdir}/bashintl.h ${LIBINTL_H} ${BASHINCDIR}/gettext.h
+watch.o: ${topdir}/bashintl.h ${LIBINTL_H} ${BASHINCDIR}/gettext.h
+
+# Rules for deficient makes, like SunOS and Solaris
+stub.o: stub.c
+malloc.o: malloc.c
+table.o: table.c
+trace.o: trace.c
+stats.o: stats.c
+watch.o: watch.c

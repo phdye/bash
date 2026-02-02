@@ -58,7 +58,7 @@ man3dir = $(mandir)/$(manpfx)3
 
 INSTALL = /usr/bin/install -c
 INSTALL_DATA = ${INSTALL} -m 644
-BUILD_DIR = /prog/bash
+BUILD_DIR = /home/phdyex/my-repos/cygwin/bash
 
 SUPPORT_SRCDIR = $(topdir)/support
 

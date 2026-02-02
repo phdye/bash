@@ -35,7 +35,7 @@ loadablesdir = ${libdir}/bash
 headersdir = $(includedir)/$(PACKAGE_NAME)
 
 topdir = ../..
-BUILD_DIR = /prog/bash
+BUILD_DIR = /home/phdyex/my-repos/cygwin/bash
 srcdir = .
 
 
@@ -49,21 +49,21 @@ INSTALL_DATA = ${INSTALL} -m 644
 INSTALLMODE= -m 0755
 
 
-CC = wasicc
+CC = gcc
 RM = rm -f
 
 SHELL = /bin/sh
 
-host_os = linux-muslx32
+host_os = cygwin
 host_cpu = x86_64
 host_vendor = pc
 
 CFLAGS = -g -O2 -Wno-parentheses -Wno-format-security
-LOCAL_CFLAGS = 
+LOCAL_CFLAGS = -DRECYCLES_PIDS
 DEFS = -DHAVE_CONFIG_H
 LOCAL_DEFS = -DSHELL
 
-CPPFLAGS = 
+CPPFLAGS = -I/home/phdyex/include
 
 BASHINCDIR = ${topdir}/include
 
@@ -73,8 +73,8 @@ LIBBUILD = ${BUILD_DIR}/lib
 
 INTL_LIBSRC = ${topdir}/lib/intl
 INTL_BUILDDIR = ${LIBBUILD}/intl
-INTL_INC = -I${INTL_LIBSRC} -I${INTL_BUILDDIR}
-LIBINTL_H = ${INTL_BUILDDIR}/libintl.h
+INTL_INC = 
+LIBINTL_H = 
 
 CCFLAGS = $(DEFS) $(LOCAL_DEFS) $(LOCAL_CFLAGS) $(CPPFLAGS) $(CFLAGS)
 
@@ -84,13 +84,14 @@ CCFLAGS = $(DEFS) $(LOCAL_DEFS) $(LOCAL_CFLAGS) $(CPPFLAGS) $(CFLAGS)
 # dynamic loading of shared objects, please update the script and send the
 # changes to bash-maintainers@gnu.org.
 #
-SHOBJ_CC = 
+SHOBJ_CC = gcc
 SHOBJ_CFLAGS = 
-SHOBJ_LD = 
-SHOBJ_LDFLAGS =   -L./lib/termcap
+SHOBJ_LD = $(CC)
+SHOBJ_LDFLAGS = -shared -Wl,--enable-auto-import -Wl,--enable-auto-image-base -Wl,--export-all -Wl,--out-implib=$(@).a 
 SHOBJ_XLDFLAGS = 
-SHOBJ_LIBS = 
-SHOBJ_STATUS = unsupported
+# Cygwin: loadables need to link against bash DLL import library
+SHOBJ_LIBS =  -L$(BUILD_DIR) -lcygbash
+SHOBJ_STATUS = supported
 
 INC = -I. -I.. -I$(topdir) -I$(topdir)/lib -I$(topdir)/builtins -I${srcdir} \
       -I$(BASHINCDIR) -I$(BUILD_DIR) -I$(LIBBUILD) \
@@ -104,7 +105,7 @@ ALLPROG = print truefalse sleep finfo logname basename dirname fdflags \
 	  tty pathchk tee head mkdir rmdir mkfifo mktemp printenv id whoami \
 	  uname sync push ln unlink realpath strftime mypid setpgid seq rm \
 	  accept csv cut
-OTHERPROG = necho hello cat pushd stat asort
+OTHERPROG = necho hello cat pushd stat asort event_server
 
 all:	$(SHOBJ_STATUS)
 
@@ -236,6 +237,9 @@ stat:	stat.o
 asort:	asort.o
 	$(SHOBJ_LD) $(SHOBJ_LDFLAGS) $(SHOBJ_XLDFLAGS) -o $@ asort.o $(SHOBJ_LIBS)
 
+event_server:	event_server.o
+	$(SHOBJ_LD) $(SHOBJ_LDFLAGS) $(SHOBJ_XLDFLAGS) -o $@ event_server.o $(SHOBJ_LIBS)
+
 # pushd is a special case.  We use the same source that the builtin version
 # uses, with special compilation options.
 #
@@ -322,3 +326,4 @@ stat.o: stat.c
 fdflags.o: fdflags.c
 seq.o: seq.c
 asort.o: asort.c
+event_server.o: event_server.c

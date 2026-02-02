@@ -27,13 +27,13 @@
 #	these variables are filled in by the make target in Makefile
 #
 MACHINE="x86_64"
-OS="linux-muslx32"
-CC="wasicc"
+OS="cygwin"
+CC="gcc"
 CFLAGS="-g -O2 -Wno-parentheses -Wno-format-security"
 RELEASE="5.1"
 PATCHLEVEL="!PATCHLEVEL!"
 RELSTATUS="release"
-MACHTYPE="x86_64-pc-linux-muslx32"
+MACHTYPE="x86_64-pc-cygwin"
 
 PATH=/bin:/usr/bin:/usr/local/bin:$PATH
 export PATH

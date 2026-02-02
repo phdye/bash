@@ -16,7 +16,7 @@ Async Python client for the bash-server v2 NDJSON protocol.
 ## Installation
 
 ```bash
-pip install -e clients/python
+pip install -e bash-server/clients/python
 ```
 
 ## Quick Start
@@ -140,3 +140,26 @@ except TransportError:
 pip install -e ".[dev]"
 pytest
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [INSTALL.md](INSTALL.md) | Detailed installation, platform notes, verification |
+| [GUIDE.md](GUIDE.md) | Comprehensive usage guide — all transports, channels, patterns |
+| [API.md](API.md) | Full API reference — every class, method, type, constant |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Internals for contributors — module structure, message routing |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, code style, testing, PR process |
+| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues, connection failures, debugging tips |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [api-metadata.json](api-metadata.json) | Machine-readable API index for AI tools |
+| [examples/](examples/README.md) | Annotated examples with expected output |
+
+### See Also
+
+- [Client bindings overview](../README.md) — all 4 language bindings
+- [Cross-binding comparison](../COMPARISON.md) — choosing a language
+- [Protocol reference](../PROTOCOL.md) — v2 NDJSON wire format
+- [Testing guide](../TESTING.md) — testing philosophy and patterns
+- [bash-server-client-python(7)](../../doc/server/man/man7/bash-server-client-python.7.md) — man page overview
+- [Server documentation](../../doc/server/README.md) — bash-server internals

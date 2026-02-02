@@ -1,93 +1,168 @@
-CC=clang
-LLD_PATH=/prog/rust/build/x86_64-unknown-linux-gnu/lld/bin
+## -*- text -*- ####################################################
+#								   #
+# Makefile for the GNU Glob Library.				   #
+#								   #
+####################################################################
+#
+# Copyright (C) 1996-2009 Free Software Foundation, Inc.     
 
-PACKAGE = bash
-prefix = /usr/local
-datarootdir = ${prefix}/share
-datadir = ${datarootdir}
-infodir = ${datarootdir}/info
-localedir = ${datarootdir}/locale
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
 
-Machine = wasm32
-OS = wasi
-VENDOR = wasmer
-MACHTYPE = wasm32-wasmer-wasi
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
 
-CFLAGS = --target=wasm32-wasmer-wasi \
-         -O2 \
-         -include strmatch.h \
-         -include ../../config.h \
-         --sysroot ../../../wasix-libc/sysroot32 \
-         -I. \
-         -I.. \
-         -I../.. \
-         -I../../include \
-         -I../../lib \
-         -matomics \
-         -mbulk-memory \
-         -mmutable-globals \
-         -pthread \
-         -mthread-model posix \
-         -ftls-model=local-exec \
-         -fno-trapping-math \
-         -DLOCALEDIR='"$(localedir)"' \
-         -DPACKAGE='"$(PACKAGE)"' \
-         -DCONF_HOSTTYPE='"$(Machine)"' \
-         -DCONF_OSTYPE='"$(OS)"' \
-         -DCONF_MACHTYPE='"$(MACHTYPE)"' \
-         -DCONF_VENDOR='"$(VENDOR)"' \
-         -D_WASI_EMULATED_MMAN \
-         -D_WASI_EMULATED_SIGNAL \
-         -D_WASI_EMULATED_PROCESS_CLOCKS \
-         -Wall \
-         -Wextra \
-         -Werror \
-         -Wno-null-pointer-arithmetic \
-         -Wno-unused-parameter \
-         -Wno-sign-compare \
-         -Wno-unused-variable \
-         -Wno-unused-function \
-         -Wno-ignored-attributes \
-         -Wno-missing-braces \
-         -Wno-ignored-pragmas \
-         -Wno-unused-but-set-variable \
-         -Wno-unknown-warning-option \
-         -Wno-parentheses \
-         -Wno-shift-op-parentheses \
-         -Wno-bitwise-op-parentheses \
-         -Wno-logical-op-parentheses \
-         -Wno-string-plus-int \
-         -Wno-dangling-else \
-         -Wno-unknown-pragmas \
-         -Wno-format-security \
-         -Wno-unused-label \
-         -Wno-incompatible-pointer-types \
-         -Wno-deprecated-non-prototype \
-         -MD \
-         -MP
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#SRC=$(wildcard *.c)
+srcdir = .
 
-SRC = glob \
-      strmatch \
-      smatch \
-      gmisc \
-      xmbsrtowcs
+topdir = ../..
+BUILD_DIR = /home/phdyex/my-repos/cygwin/bash
 
-OBJS = $(SRC:=.o)
+INSTALL = /usr/bin/install -c
+INSTALL_PROGRAM = ${INSTALL}
+INSTALL_DATA = ${INSTALL} -m 644
 
-all: $(OBJS)
+CC = gcc
+RANLIB = ranlib
+AR = ar
+ARFLAGS = cr
+RM = rm -f
+CP = cp
+MV = mv
 
-%: %.c
-	clang $(CFLAGS) \
-              $@.c \
-			  -c \
-              -o $@.o
+SHELL = /bin/sh
 
-export PATH := $(LLD_PATH):$(PATH)
+PROFILE_FLAGS = 
+
+CFLAGS = -g -O2 -Wno-parentheses -Wno-format-security
+LOCAL_CFLAGS = -DRECYCLES_PIDS
+CPPFLAGS = -I/home/phdyex/include
+LDFLAGS =  
+
+DEFS = -DHAVE_CONFIG_H
+LOCAL_DEFS = -DSHELL
+
+BASHINCDIR = ${topdir}/include
+
+INCLUDES = -I. -I../.. -I$(topdir) -I$(BASHINCDIR) -I$(topdir)/lib
+
+CCFLAGS = $(PROFILE_FLAGS) $(DEFS) $(LOCAL_DEFS) ${INCLUDES} $(CPPFLAGS) \
+	  $(LOCAL_CFLAGS) $(CFLAGS) ${ADDON_CFLAGS}
+
+# Here is a rule for making .o files from .c files that doesn't force
+# the type of the machine (like -sun3) into the flags.
+.c.o:
+	$(RM) $@
+	$(CC) -c $(CCFLAGS) $<
+
+# The name of the library target.
+LIBRARY_NAME = libglob.a
+
+# The C code source files for this library.
+CSOURCES = $(srcdir)/glob.c $(srcdir)/strmatch.c $(srcdir)/smatch.c \
+	   $(srcdir)/xmbsrtowcs.c
+
+# The header files for this library.
+HSOURCES = $(srcdir)/strmatch.h
+
+OBJECTS = glob.o strmatch.o smatch.o xmbsrtowcs.o gmisc.o
+
+# The texinfo files which document this library.
+DOCSOURCE = doc/glob.texi
+DOCOBJECT = doc/glob.dvi
+DOCSUPPORT = doc/Makefile
+DOCUMENTATION = $(DOCSOURCE) $(DOCOBJECT) $(DOCSUPPORT)
+
+SUPPORT = Makefile ChangeLog $(DOCSUPPORT)
+
+SOURCES  = $(CSOURCES) $(HSOURCES) $(DOCSOURCE)
+
+THINGS_TO_TAR = $(SOURCES) $(SUPPORT)
+
+######################################################################
+
+all: $(LIBRARY_NAME)
+
+$(LIBRARY_NAME): $(OBJECTS)
+	$(RM) -f $@
+	$(AR) $(ARFLAGS) $@ $(OBJECTS)
+	-test -n "$(RANLIB)" && $(RANLIB) $@
+
+what-tar:
+	@for file in $(THINGS_TO_TAR); do \
+	  echo $(selfdir)$$file; \
+	done
+
+documentation: force
+	-(cd doc; $(MAKE) $(MFLAGS))
+force:
+
+# The rule for 'includes' is written funny so that the if statement
+# always returns TRUE unless there really was an error installing the
+# include files.
+install:
 
 clean:
-	rm -f *.o
-	rm -f *.s
-	rm -f *.ll
-	rm -f *.wasm
+	rm -f $(OBJECTS) $(LIBRARY_NAME)
+	-(cd doc && $(MAKE) $(MFLAGS) $@ )
+
+realclean distclean maintainer-clean: clean
+	-( cd doc && $(MAKE) $(MFLAGS) $@ )
+	$(RM) -f Makefile
+
+mostlyclean: clean
+	-( cd doc && $(MAKE) $(MFLAGS) $@ )
+
+${BUILD_DIR}/pathnames.h: ${BUILD_DIR}/config.h ${BUILD_DIR}/Makefile Makefile
+	-( cd ${BUILD_DIR} && ${MAKE} ${MFLAGS} pathnames.h )
+
+######################################################################
+#								     #
+#  Dependencies for the object files which make up this library.     #
+#								     #
+######################################################################
+
+smatch.o: strmatch.h
+smatch.o: $(BUILD_DIR)/config.h
+smatch.o: $(BASHINCDIR)/chartypes.h
+smatch.o: $(BASHINCDIR)/ansi_stdlib.h $(topdir)/bashansi.h
+smatch.o: $(BASHINCDIR)/shmbutil.h
+smatch.o: $(topdir)/xmalloc.h
+
+strmatch.o: strmatch.h
+strmatch.o: $(BUILD_DIR)/config.h
+strmatch.o: $(BASHINCDIR)/stdc.h
+
+glob.o: $(BUILD_DIR)/config.h
+glob.o: $(topdir)/shell.h $(BUILD_DIR)/pathnames.h
+glob.o: $(topdir)/bashtypes.h $(BASHINCDIR)/ansi_stdlib.h $(topdir)/bashansi.h
+glob.o: $(BASHINCDIR)/posixstat.h $(BASHINCDIR)/memalloc.h
+glob.o: strmatch.h glob.h
+glob.o: $(BASHINCDIR)/shmbutil.h
+glob.o: $(topdir)/xmalloc.h
+
+gmisc.o: $(BUILD_DIR)/config.h
+gmisc.o: $(topdir)/bashtypes.h $(BASHINCDIR)/ansi_stdlib.h $(topdir)/bashansi.h
+gmisc.o: $(BASHINCDIR)/shmbutil.h
+
+xmbsrtowcs.o: ${BUILD_DIR}/config.h
+xmbsrtowcs.o: ${topdir}/bashansi.h ${BASHINCDIR}/ansi_stdlib.h
+xmbsrtowcs.o: ${BASHINCDIR}/shmbutil.h
+
+# Rules for deficient makes, like SunOS and Solaris
+glob.o: glob.c
+gmisc.o: gmisc.c
+strmatch.o: strmatch.c
+smatch.o: smatch.c
+xmbsrtowcs.o: xmbsrtowcs.c
+
+# dependencies for C files that include other C files
+glob.o: glob_loop.c
+gmisc.o: gm_loop.c
+smatch.o: sm_loop.c

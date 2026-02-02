@@ -27,6 +27,7 @@
 /* Global state */
 static volatile sig_atomic_t server_running = 1;
 static volatile sig_atomic_t got_sigchld = 0;
+static volatile sig_atomic_t active_clients = 0;
 static int server_fd = -1;
 static server_config_t config;
 
@@ -154,8 +155,10 @@ reap_children(void)
 {
     int status;
     pid_t pid;
-    
+
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (active_clients > 0)
+            active_clients--;
         if (config.verbose) {
             fprintf(stderr, "bash-server: child %d exited with status %d\n",
                     (int)pid, WEXITSTATUS(status));
@@ -191,6 +194,16 @@ print_usage(const char *progname)
     printf("  -p, --pidfile PATH  Write PID to file\n");
     printf("  -m, --max-clients N Maximum simultaneous clients (default: 10)\n");
     printf("  -P, --no-peercred   Disable Cygwin credential handshake (Python compat)\n");
+    printf("  -l, --login         Login shell initialization (source /etc/profile etc.)\n");
+    printf("      --norc          Skip sourcing ~/.bashrc\n");
+    printf("      --noprofile     Skip sourcing /etc/profile and ~/.bash_profile\n");
+    printf("  -I, --init SCRIPT   Source additional init script per session\n");
+    printf("  -S, --stdio         Use stdin/stdout instead of socket (single session)\n");
+    printf("  -f, --fd N          Use inherited fd N for I/O (single session)\n");
+    printf("  -A, --auth-fd N     Write TOKEN to fd N (default: stderr; stdio/fd modes)\n");
+#ifdef __CYGWIN__
+    printf("  -W, --named-pipe N  Use Windows Named Pipe (\\\\.\\pipe\\bash-server-N)\n");
+#endif
     printf("  -v, --verbose       Verbose output\n");
     printf("  -h, --help          Show this help\n");
     printf("  -V, --version       Show version\n");
@@ -232,6 +245,16 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
         {"pidfile",     required_argument, 0, 'p'},
         {"max-clients", required_argument, 0, 'm'},
         {"no-peercred", no_argument,       0, 'P'},
+        {"login",       no_argument,       0, 'l'},
+        {"norc",        no_argument,       0, 'R'},
+        {"noprofile",   no_argument,       0, 'N'},
+        {"init",        required_argument, 0, 'I'},
+        {"stdio",       no_argument,       0, 'S'},
+        {"fd",          required_argument, 0, 'f'},
+        {"auth-fd",     required_argument, 0, 'A'},
+#ifdef __CYGWIN__
+        {"named-pipe",  required_argument, 0, 'W'},
+#endif
         {"verbose",     no_argument,       0, 'v'},
         {"help",        no_argument,       0, 'h'},
         {"version",     no_argument,       0, 'V'},
@@ -243,8 +266,10 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
     /* Defaults */
     memset(cfg, 0, sizeof(*cfg));
     cfg->max_clients = 10;
+    cfg->client_fd = -1;
+    cfg->auth_fd = -1;  /* default: stderr */
 
-    while ((c = getopt_long(argc, argv, "s:dp:m:PvhV", long_options, &option_index)) != -1) {
+    while ((c = getopt_long(argc, argv, "s:dp:m:PlRNI:Sf:A:W:vhV", long_options, &option_index)) != -1) {
         switch (c) {
             case 's':
                 cfg->socket_path = optarg;
@@ -263,6 +288,33 @@ parse_arguments(int argc, char **argv, server_config_t *cfg)
             case 'P':
                 cfg->no_peercred = 1;
                 break;
+            case 'l':
+                cfg->login_mode = 1;
+                break;
+            case 'R':
+                cfg->norc = 1;
+                break;
+            case 'N':
+                cfg->noprofile = 1;
+                break;
+            case 'I':
+                cfg->init_file = optarg;
+                break;
+            case 'S':
+                cfg->stdio_mode = 1;
+                break;
+            case 'f':
+                cfg->fd_mode = 1;
+                cfg->client_fd = atoi(optarg);
+                break;
+            case 'A':
+                cfg->auth_fd = atoi(optarg);
+                break;
+#ifdef __CYGWIN__
+            case 'W':
+                cfg->named_pipe = optarg;
+                break;
+#endif
             case 'v':
                 cfg->verbose = 1;
                 break;
@@ -425,9 +477,8 @@ generate_auth_token(server_config_t *cfg)
 {
     unsigned char raw[SERVER_TOKEN_BYTES];
     char hex[SERVER_TOKEN_HEXLEN + 1];
-    int urandom_fd, token_fd;
+    int urandom_fd;
     ssize_t n;
-    size_t pathlen;
     int i;
 
     /* Read random bytes from /dev/urandom */
@@ -457,35 +508,41 @@ generate_auth_token(server_config_t *cfg)
     if (!cfg->auth_token)
         return -1;
 
-    /* Build token file path: <socket_path>.token */
-    pathlen = strlen(cfg->socket_path) + 7; /* ".token\0" */
-    cfg->auth_file = malloc(pathlen);
-    if (!cfg->auth_file)
-        return -1;
-    snprintf(cfg->auth_file, pathlen, "%s.token", cfg->socket_path);
+    /* Write token to file only in socket mode (socket_path is set).
+       In stdio/fd modes, token is delivered via auth_fd instead. */
+    if (cfg->socket_path) {
+        int token_fd;
+        size_t pathlen;
+        /* Build token file path: <socket_path>.token */
+        pathlen = strlen(cfg->socket_path) + 7; /* ".token\0" */
+        cfg->auth_file = malloc(pathlen);
+        if (!cfg->auth_file)
+            return -1;
+        snprintf(cfg->auth_file, pathlen, "%s.token", cfg->socket_path);
 
-    /* Remove stale token file if present */
-    unlink(cfg->auth_file);
-
-    /* Write token to file with restrictive permissions.
-       Use open()+write() instead of fopen() to set mode atomically. */
-    token_fd = open(cfg->auth_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
-    if (token_fd < 0) {
-        fprintf(stderr, "bash-server: cannot create %s: %s\n",
-                cfg->auth_file, strerror(errno));
-        return -1;
-    }
-
-    n = write(token_fd, hex, SERVER_TOKEN_HEXLEN);
-    if (n != SERVER_TOKEN_HEXLEN) {
-        fprintf(stderr, "bash-server: short write to %s\n", cfg->auth_file);
-        close(token_fd);
+        /* Remove stale token file if present */
         unlink(cfg->auth_file);
-        return -1;
+
+        /* Write token to file with restrictive permissions.
+           Use open()+write() instead of fopen() to set mode atomically. */
+        token_fd = open(cfg->auth_file, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        if (token_fd < 0) {
+            fprintf(stderr, "bash-server: cannot create %s: %s\n",
+                    cfg->auth_file, strerror(errno));
+            return -1;
+        }
+
+        n = write(token_fd, hex, SERVER_TOKEN_HEXLEN);
+        if (n != SERVER_TOKEN_HEXLEN) {
+            fprintf(stderr, "bash-server: short write to %s\n", cfg->auth_file);
+            close(token_fd);
+            unlink(cfg->auth_file);
+            return -1;
+        }
+        /* Write trailing newline for easy `cat` / shell read */
+        write(token_fd, "\n", 1);
+        close(token_fd);
     }
-    /* Write trailing newline for easy `cat` / shell read */
-    write(token_fd, "\n", 1);
-    close(token_fd);
 
     /* Clear raw bytes from stack */
     memset(raw, 0, sizeof(raw));
@@ -508,92 +565,326 @@ handle_client(int client_fd, server_config_t *cfg)
     session_cleanup(&session);
 }
 
-/* Main entry point */
-int
-main(int argc, char **argv)
+/* Deliver auth token to the appropriate destination.
+   Socket mode: already handled via generate_auth_token() writing .token file.
+   Stdio/fd mode: write "TOKEN <hex>\n" to auth_fd (default: stderr). */
+static void
+deliver_token_fd(server_config_t *cfg)
 {
-    int client_fd;
-    
-    /* Parse arguments */
-    if (parse_arguments(argc, argv, &config) < 0) {
-        print_usage(argv[0]);
-        exit(1);
+    int fd = (cfg->auth_fd >= 0) ? cfg->auth_fd : STDERR_FILENO;
+    char buf[SERVER_TOKEN_HEXLEN + 8];  /* "TOKEN " + hex + "\n\0" */
+    int len;
+
+    len = snprintf(buf, sizeof(buf), "TOKEN %s\n", cfg->auth_token);
+    write(fd, buf, len);
+}
+
+/* Run in stdio or fd transport mode (single session, no accept loop) */
+static int
+run_single_session(server_config_t *cfg)
+{
+    client_session_t session;
+
+    /* Generate token and deliver via fd (not file) */
+    if (generate_auth_token(cfg) < 0) {
+        fprintf(stderr, "bash-server: failed to generate auth token\n");
+        return 1;
     }
-    
-    /* Daemonize if requested */
-    if (config.daemon_mode) {
-        if (server_daemonize() < 0) {
-            fprintf(stderr, "bash-server: failed to daemonize: %s\n", strerror(errno));
-            exit(1);
+    deliver_token_fd(cfg);
+
+    if (cfg->stdio_mode) {
+        /* Stdio mode: read commands from stdin, write responses to stdout */
+        if (session_init(&session, STDIN_FILENO) < 0)
+            return 1;
+        session.write_fd = STDOUT_FILENO;
+
+        if (cfg->verbose) {
+            fprintf(stderr, "bash-server: stdio mode (read=0, write=1)\n");
+            fflush(stderr);
+        }
+    } else {
+        /* --fd N mode: bidirectional on a single inherited fd */
+        if (session_init(&session, cfg->client_fd) < 0)
+            return 1;
+
+        if (cfg->verbose) {
+            fprintf(stderr, "bash-server: fd mode (fd=%d)\n", cfg->client_fd);
+            fflush(stderr);
         }
     }
-    
+
+    session_handle(&session, cfg);
+    session_cleanup(&session);
+    return 0;
+}
+
+/* Run in socket transport mode (multi-session accept loop) */
+static int
+run_socket_server(server_config_t *cfg)
+{
+    int client_fd;
+
     /* Resolve socket path: CLI > env > config file > default */
-    if (resolve_socket_path(&config) < 0) {
+    if (resolve_socket_path(cfg) < 0) {
         fprintf(stderr, "bash-server: failed to resolve socket path\n");
-        exit(1);
+        return 1;
     }
 
-    /* Set up signal handlers */
-    setup_signals();
-
     /* Create Unix domain socket */
-    server_fd = server_socket_create(config.socket_path, config.no_peercred);
+    server_fd = server_socket_create(cfg->socket_path, cfg->no_peercred);
     if (server_fd < 0) {
         fprintf(stderr, "bash-server: failed to create socket %s: %s\n",
-                config.socket_path, strerror(errno));
-        exit(1);
+                cfg->socket_path, strerror(errno));
+        return 1;
     }
 
     /* Generate auth token and write to <socket>.token */
-    if (generate_auth_token(&config) < 0) {
+    if (generate_auth_token(cfg) < 0) {
         fprintf(stderr, "bash-server: failed to generate auth token\n");
-        server_socket_close(server_fd, config.socket_path);
-        exit(1);
+        server_socket_close(server_fd, cfg->socket_path);
+        return 1;
     }
 
-    if (config.verbose) {
-        fprintf(stderr, "bash-server: listening on %s\n", config.socket_path);
-        fprintf(stderr, "bash-server: auth token in %s\n", config.auth_file);
+    if (cfg->verbose) {
+        fprintf(stderr, "bash-server: listening on %s\n", cfg->socket_path);
+        fprintf(stderr, "bash-server: auth token in %s\n", cfg->auth_file);
     }
 
     /* Write PID file */
-    if (config.pid_file) {
-        write_pid_file(config.pid_file);
+    if (cfg->pid_file) {
+        write_pid_file(cfg->pid_file);
     }
-    
-    /* Main accept loop */
+
+    /* Main accept loop — fork-per-session model.
+       Each accepted client gets its own child process that persists for
+       the lifetime of the connection.  Bash state (variables, functions,
+       working directory) is preserved across EVAL commands within a session.
+
+       Note on Cygwin: AF_UNIX sockets are emulated over TCP loopback with
+       a credential handshake (SO_PEERCRED).  The --no-peercred flag disables
+       this handshake, which corrupts the data stream (credential bytes leak
+       into application reads).  Do NOT use --no-peercred with C clients;
+       it exists only for Python clients that use non-blocking connect. */
     while (server_running) {
-        /* Reap any zombie children */
-        if (got_sigchld) {
+        pid_t session_pid;
+
+        if (got_sigchld)
             reap_children();
-        }
-        
-        /* Accept new connection */
+
         client_fd = server_accept_client(server_fd);
         if (client_fd < 0) {
             if (errno == EINTR)
                 continue;
             if (!server_running)
                 break;
-            fprintf(stderr, "bash-server: accept failed: %s (errno=%d)\n", strerror(errno), errno);
+            fprintf(stderr, "bash-server: accept failed: %s (errno=%d)\n",
+                    strerror(errno), errno);
             fflush(stderr);
             continue;
         }
 
-        fprintf(stderr, "bash-server: client connected (fd=%d)\n", client_fd);
-        fflush(stderr);
-        
-        /* Handle client directly (single-threaded for now) */
-        handle_client(client_fd, &config);
+        if (cfg->verbose) {
+            fprintf(stderr, "bash-server: client connected (fd=%d)\n", client_fd);
+            fflush(stderr);
+        }
+
+        /* Enforce max_clients limit */
+        if (active_clients >= cfg->max_clients) {
+            if (cfg->verbose) {
+                fprintf(stderr, "bash-server: max clients (%d) reached, rejecting\n",
+                        cfg->max_clients);
+                fflush(stderr);
+            }
+            protocol_write_line(client_fd, "%s server busy (max clients reached)", RSP_ERR);
+            close(client_fd);
+            continue;
+        }
+
+        session_pid = fork();
+        if (session_pid < 0) {
+            fprintf(stderr, "bash-server: session fork failed: %s\n",
+                    strerror(errno));
+            fflush(stderr);
+            close(client_fd);
+            continue;
+        }
+
+        if (session_pid == 0) {
+            close(server_fd);
+            signal(SIGCHLD, SIG_DFL);
+            signal(SIGINT, SIG_DFL);
+            signal(SIGTERM, SIG_DFL);
+            handle_client(client_fd, cfg);
+            _exit(0);
+        }
+
+        active_clients++;
+        if (cfg->verbose) {
+            fprintf(stderr, "bash-server: session pid=%d for client fd=%d (%d/%d clients)\n",
+                    (int)session_pid, client_fd,
+                    (int)active_clients, cfg->max_clients);
+            fflush(stderr);
+        }
+        close(client_fd);
     }
-    
+
     /* Cleanup */
     server_shutdown();
-    
-    if (config.verbose) {
+
+    if (cfg->verbose) {
         fprintf(stderr, "bash-server: shutdown complete\n");
     }
-    
+
     return 0;
+}
+
+#ifdef __CYGWIN__
+/* Run in Windows Named Pipe transport mode (multi-session accept loop).
+   Bypasses Cygwin's AF_UNIX-over-TCP-loopback emulation, eliminating
+   the SO_PEERCRED handshake race condition. */
+static int
+run_named_pipe_server(server_config_t *cfg)
+{
+    char token_path[PATH_MAX];
+
+    /* Generate auth token */
+    if (generate_auth_token(cfg) < 0) {
+        fprintf(stderr, "bash-server: failed to generate auth token\n");
+        return 1;
+    }
+
+    /* Resolve token file path and write token */
+    if (server_winpipe_token_path(cfg->named_pipe, token_path, sizeof(token_path)) < 0)
+        return 1;
+
+    cfg->auth_file = strdup(token_path);
+    {
+        int token_fd;
+        /* Remove stale token file */
+        unlink(token_path);
+        token_fd = open(token_path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+        if (token_fd < 0) {
+            fprintf(stderr, "bash-server: cannot create %s: %s\n",
+                    token_path, strerror(errno));
+            return 1;
+        }
+        write(token_fd, cfg->auth_token, strlen(cfg->auth_token));
+        write(token_fd, "\n", 1);
+        close(token_fd);
+    }
+
+    if (cfg->verbose) {
+        fprintf(stderr, "bash-server: named pipe mode (pipe=bash-server-%s)\n",
+                cfg->named_pipe);
+        fprintf(stderr, "bash-server: auth token in %s\n", token_path);
+        fflush(stderr);
+    }
+
+    /* Write PID file */
+    if (cfg->pid_file) {
+        write_pid_file(cfg->pid_file);
+    }
+
+    /* Accept loop: create pipe instance, wait for client, handle, repeat.
+
+       Named pipe fds from cygwin_attach_handle_to_fd() do NOT survive
+       fork() + parent close() on Cygwin — the parent's close() calls
+       CloseHandle() on the underlying Win32 HANDLE, disconnecting the
+       pipe even though the child has a "copy" of the fd.
+
+       Instead, we handle each client directly in the main process.
+       Each iteration creates a fresh pipe instance via CreateNamedPipeW,
+       so new clients can queue on the pipe name while we handle the
+       current client.  For concurrent sessions, use Unix socket mode. */
+    while (server_running) {
+        HANDLE pipe_handle;
+        int client_fd;
+
+        if (got_sigchld)
+            reap_children();
+
+        /* Create a new pipe instance */
+        pipe_handle = server_winpipe_create(cfg->named_pipe);
+        if (pipe_handle == INVALID_HANDLE_VALUE) {
+            if (!server_running)
+                break;
+            fprintf(stderr, "bash-server: pipe create failed, retrying...\n");
+            fflush(stderr);
+            sleep(1);
+            continue;
+        }
+
+        /* Wait for a client (polls server_running every 500ms) */
+        client_fd = server_winpipe_accept(pipe_handle, &server_running);
+        if (client_fd < 0) {
+            if (!server_running || errno == EINTR) {
+                CloseHandle(pipe_handle);
+                break;
+            }
+            fprintf(stderr, "bash-server: pipe accept failed\n");
+            fflush(stderr);
+            CloseHandle(pipe_handle);
+            continue;
+        }
+
+        if (cfg->verbose) {
+            fprintf(stderr, "bash-server: client connected (pipe fd=%d)\n", client_fd);
+            fflush(stderr);
+        }
+
+        /* Handle client directly (no fork — see comment above) */
+        handle_client(client_fd, cfg);
+    }
+
+    /* Cleanup */
+    if (cfg->auth_file) {
+        unlink(cfg->auth_file);
+    }
+    if (cfg->pid_file) {
+        unlink(cfg->pid_file);
+    }
+    reap_children();
+
+    if (cfg->verbose) {
+        fprintf(stderr, "bash-server: shutdown complete\n");
+    }
+
+    return 0;
+}
+#endif /* __CYGWIN__ */
+
+/* Main entry point */
+int
+main(int argc, char **argv)
+{
+    /* Parse arguments */
+    if (parse_arguments(argc, argv, &config) < 0) {
+        print_usage(argv[0]);
+        exit(1);
+    }
+
+    /* Daemonize if requested (socket/named-pipe mode only) */
+    if (config.daemon_mode) {
+        if (config.stdio_mode || config.fd_mode) {
+            fprintf(stderr, "bash-server: --daemon incompatible with --stdio/--fd\n");
+            exit(1);
+        }
+        if (server_daemonize() < 0) {
+            fprintf(stderr, "bash-server: failed to daemonize: %s\n", strerror(errno));
+            exit(1);
+        }
+    }
+
+    /* Set up signal handlers */
+    setup_signals();
+
+    /* Dispatch based on transport mode */
+    if (config.stdio_mode || config.fd_mode)
+        return run_single_session(&config);
+#ifdef __CYGWIN__
+    else if (config.named_pipe)
+        return run_named_pipe_server(&config);
+#endif
+    else
+        return run_socket_server(&config);
 }

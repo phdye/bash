@@ -30,14 +30,14 @@
 topdir = ..
 srcdir = .
 
-BUILD_DIR = /prog/bash
+BUILD_DIR = /home/phdyex/my-repos/cygwin/bash
 
 RM	= rm -f
 SHELL	= /bin/sh
-CC = wasicc
+CC = gcc
 CC_FOR_BUILD = $(CC)
 
-EXEEXT = 
+EXEEXT = .exe
 
 #
 # Compiler options:
@@ -46,17 +46,17 @@ PROFILE_FLAGS =
 
 CFLAGS = -g -O2 -Wno-parentheses -Wno-format-security
 CFLAGS_FOR_BUILD = -g -O2 -Wno-parentheses -Wno-format-security
-CPPFLAGS = 
-CPPFLAGS_FOR_BUILD = 
-LOCAL_CFLAGS = 
+CPPFLAGS = -I/home/phdyex/include
+CPPFLAGS_FOR_BUILD = -I/home/phdyex/include
+LOCAL_CFLAGS = -DRECYCLES_PIDS
 DEFS = -DHAVE_CONFIG_H
 LOCAL_DEFS = -DSHELL
 
-LIBS = 
+LIBS = -ldl 
 LIBS_FOR_BUILD = ${LIBS}		# XXX
 
-LOCAL_LDFLAGS = -rdynamic
-LDFLAGS =  -L./lib/termcap $(LOCAL_LDFLAGS) $(CFLAGS)
+LOCAL_LDFLAGS = 
+LDFLAGS =  $(LOCAL_LDFLAGS) $(CFLAGS)
 LDFLAGS_FOR_BUILD = $(LDFLAGS) $(LOCAL_LDFLAGS) $(CFLAGS_FOR_BUILD)
 
 INCLUDES = -I${BUILD_DIR} -I${topdir}
