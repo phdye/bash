@@ -833,6 +833,28 @@ execute_command_internal (
 
   QUIT;
 
+  /* Run pre-command hooks for compound commands.
+     Simple commands (cm_simple) handle hooks in execute_simple_command().
+     We fire hooks here for all other command types that represent actual
+     execution: loops, conditionals, groups, pipelines, etc.
+
+     Note: We always call make_command_string() for compound commands because
+     the_printed_command_except_trap may contain a stale value from a previous
+     simple command execution. */
+  if (command->type != cm_simple && pre_command_hooks_count () > 0)
+    {
+      pre_command_info_t pre_info;
+      char *cmdstr = make_command_string (command);
+
+      pre_info.command_string = cmdstr;
+      pre_info.cwd = get_string_value ("PWD");
+      pre_info.line_number = line_number;
+      pre_info.is_subshell = subshell_environment != 0;
+      pre_info.is_async = asynchronous;
+      pre_info.command = command;
+      run_pre_command_hooks (&pre_info);
+    }
+
   switch (command->type)
     {
     case cm_simple:
@@ -1087,6 +1109,18 @@ execute_command_internal (
 
     default:
       command_error ("execute_command", CMDERR_BADTYPE, command->type, 0);
+    }
+
+  /* Run post-command hooks for compound commands.
+     Simple commands handle hooks in execute_simple_command().
+     Use make_command_string() directly (see pre-command hook comment). */
+  if (command->type != cm_simple && post_command_hooks_count () > 0)
+    {
+      post_command_info_t post_info;
+      post_info.command_string = make_command_string (command);
+      post_info.exit_status = exec_result;
+      post_info.signal_number = 0;
+      run_post_command_hooks (&post_info);
     }
 
   if (my_undo_list)
