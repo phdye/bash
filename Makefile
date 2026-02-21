@@ -55,10 +55,6 @@ man1ext = .1
 man1dir = $(mandir)/$(manpfx)1
 man3ext = .3
 man3dir = $(mandir)/$(manpfx)3
-man5ext = .5
-man5dir = $(mandir)/$(manpfx)5
-man7ext = .7
-man7dir = $(mandir)/$(manpfx)7
 
 htmldir = ${docdir}
 
@@ -111,7 +107,7 @@ OBJEXT = o
 VERSPROG = bashversion$(EXEEXT)
 VERSOBJ = bashversion.$(OBJEXT)
 
-Program = bash$(EXEEXT)
+Program = ss-bash$(EXEEXT)
 
 # Cygwin DLL support for loadable builtins
 BASH_DLL = cygbash-5.1.dll
@@ -622,7 +618,8 @@ $(BASH_DLL): .build $(DLL_OBJECTS) $(BUILTINS_DEP) $(LIBDEP)
 		-o $@ $(DLL_OBJECTS) $(LIBS)
 	ls -l $(BASH_DLL) $(BASH_IMPLIB)
 
-# bash.exe links shell_stub.o (with main) against the DLL
+# ss-bash.exe links shell_stub.o (with main) against the DLL
+# Named ss-bash to distinguish from vanilla bash per shell-server convention
 $(Program): .build shell_stub.o $(BASH_DLL)
 	$(RM) $@
 	$(CC) $(LDFLAGS) -o $@ shell_stub.o -L. -lcygbash
@@ -1014,11 +1011,7 @@ bashclient: .made
 		echo "bashclient not configured (use --enable-bash-server)"; \
 	fi
 
-install-bash-server-man:
-	( cd doc/server/man && $(MAKE) $(MFLAGS) \
-	    mandir=$(mandir) docdir=$(docdir) DESTDIR=$(DESTDIR) install )
-
-install-bash-server: bash-server bashclient install-bash-server-man
+install-bash-server: bash-server bashclient
 	@if test -d bash-server && test -f bash-server/Makefile; then \
 		( cd bash-server && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) install ); \
 		( cd bashclient && $(MAKE) $(MFLAGS) DESTDIR=$(DESTDIR) install ); \

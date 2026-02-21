@@ -107,7 +107,7 @@ OBJEXT = @OBJEXT@
 VERSPROG = bashversion$(EXEEXT)
 VERSOBJ = bashversion.$(OBJEXT)
 
-Program = bash$(EXEEXT)
+Program = ss-bash$(EXEEXT)
 
 # Cygwin DLL support for loadable builtins
 BASH_DLL = cygbash-@BASHVERS@.dll
@@ -618,7 +618,8 @@ $(BASH_DLL): .build $(DLL_OBJECTS) $(BUILTINS_DEP) $(LIBDEP)
 		-o $@ $(DLL_OBJECTS) $(LIBS)
 	ls -l $(BASH_DLL) $(BASH_IMPLIB)
 
-# bash.exe links shell_stub.o (with main) against the DLL
+# ss-bash.exe links shell_stub.o (with main) against the DLL
+# Named ss-bash to distinguish from vanilla bash per shell-server convention
 $(Program): .build shell_stub.o $(BASH_DLL)
 	$(RM) $@
 	$(CC) $(LDFLAGS) -o $@ shell_stub.o -L. -lcygbash
